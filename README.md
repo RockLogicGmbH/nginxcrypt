@@ -8,7 +8,7 @@ A Docker container which embeds an Nginx by default as reverse-proxy, linked wit
 
 The Nginx configuration is purposedly user-defined, so you can set it just the way you want, tought base templates are setup by default.
 
-You can find an examples below.
+You can find examples below.
 
 ## How does it work?
 
@@ -36,7 +36,7 @@ To run the NginxCrypt application in production:
 3. Download the [.env.example](./.env.example) file as `.env` into the same directory.
 4. Set `NXCT_SERVICE_HOST_1` in `.env` to the IP address of your machine.
 5. Run the app via `sudo docker compose up -d`
-6. Monitor the app via `sudo docker compose logs -f` (or a service like `sudo docker compose logs backend -f`)
+6. Monitor the app via `sudo docker compose logs -f`
 7. Stop the app via `sudo docker compose down`
 
 The steps above will run a Nginx reverse proxy using the `stereum/nginxcrypt:latest` Docker image with a demo frontend available thru https://MACHINE_IP and a demo backend available thru https://MACHINE_IP/api.
