@@ -1,0 +1,9 @@
+# Volume storage directories
+.volumes*
+.dev.volumes*
+
+# Environments
+.env
+
+# OS
+.DS_Store

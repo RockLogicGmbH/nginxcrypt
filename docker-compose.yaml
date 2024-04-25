@@ -1,0 +1,58 @@
+services:
+  # Setup demo backend on http://127.0.0.1:9999
+  # Available by default on http://127.0.0.1/api thru NginxCrypt reverse proxy
+  backend:
+    container_name: backend
+    image: nginx:latest
+    restart: always
+    volumes:
+      - ./demo_backend.sh:/demo_backend.sh
+    entrypoint: ["/bin/sh", "/demo_backend.sh"]
+    # Uncomment to make the demo backend also available on port 9999
+    # ports:
+    #   - 9999:80
+
+  # Setup demo frontend on http://127.0.0.1:8888
+  # Available by default on http://127.0.0.1 thru NginxCrypt reverse proxy
+  frontend:
+    container_name: frontend
+    image: nginx:latest
+    restart: always
+    volumes:
+      - ./demo_frontend.sh:/demo_frontend.sh
+    entrypoint: ["/bin/sh", "/demo_frontend.sh"]
+    # Uncomment to make the demo frontend also available on port 8888
+    # ports:
+    #   - 8888:80
+
+  # Setup NginxCrypt reverse proxy on http://127.0.0.1 (with SSL support)
+  # Build locally with: docker compose build proxy
+  proxy:
+    container_name: proxy
+    image: stereum/nginxcrypt:latest
+    #restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    # tty: true # only needed for zerossl if NXCT_SERVICE_EMAIL is given (currently disabled anyway!)
+    volumes:
+      - ./.volumes/proxy/certs:/certs
+      - ./.volumes/proxy/conf:/conf
+    env_file: .env
+    environment:
+      - NXCT_SERVICE_KEYLENGTH=ec-384
+      # - NXCT_SERVICE_EMAIL=your@email.tld
+      # - NXCT_SERVICE_DHPARAM=2048 # default 1024 (use min 2024 in production!9)
+      # - NXCT_SERVICE_DRYRUN=true
+      # - NXCT_SERVICE_DELTEOUTDATEDCERTS=true # default false
+      # - NXCT_SERVICE_CERTDIRPERMS=600 # default 777 (use 600 or similar in production)
+      # - NXCT_SERVICE_HOST_1=min.template.public-domain.tld
+      # - NXCT_SERVICE_PROXY_1=frontend:80
+      # - NXCT_SERVICE_HOST_2=api.template.public-domain.tld
+      # - NXCT_SERVICE_FRONTEND_TARGET_2=frontend:80
+      # - NXCT_SERVICE_BACKEND_TARGET_2=backend:80
+      # - NXCT_SERVICE_HOST_3=onemore.api.template.public-domain.tld
+      # - NXCT_SERVICE_FRONTEND_TARGET_3=frontend:80
+      # - NXCT_SERVICE_BACKEND_TARGET_3=backend:80
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # required on Linux!

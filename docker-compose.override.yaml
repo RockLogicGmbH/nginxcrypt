@@ -1,0 +1,17 @@
+services:
+  # Override demo backaend
+  backend:
+    ports:
+      - 9999:80
+
+  # Override demo frontend
+  frontend:
+    ports:
+      - 8888:80
+
+  # Override NginxCrypt reverse proxy
+  proxy:
+    image: dev/nginxcrypt:latest
+    # pull_policy: build
+    build: .
+    # platform: linux/amd64

@@ -1,0 +1,58 @@
+# http redirects to https (except acme validations)
+server {
+  listen 80;
+  server_name ${DOMAIN};
+  # Deny access if the request does not match the expected domain
+  if ($host != $server_name) {
+    return 406;
+  }
+  server_tokens off;
+  root /var/www/html;
+  location /.well-known {
+    try_files $uri $uri/ =404;
+  }
+  location / {
+    return 301 https://$host$request_uri;
+  }
+}
+
+# https
+server {
+  listen 443 ssl;
+  server_name ${DOMAIN};
+  # Deny access if the request does not match the expected domain
+  if ($host != $server_name) {
+    return 406;
+  }
+  server_tokens off;
+  ssl_certificate /certs/${DOMAIN}/fullchain.pem;
+  ssl_certificate_key /certs/${DOMAIN}/key.pem;
+  ssl_dhparam /certs/dhparam.pem;
+  add_header Access-Control-Allow-Origin *;
+  location / {
+    proxy_pass http://${FRONTEND_PROXY};
+    proxy_set_header Host $http_host;
+    #proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_redirect off;
+    # WebSocket support
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+  }
+  location /api {
+    rewrite ^/api(/.*)$ $1 break;
+    proxy_pass http://${BACKEND_PROXY};
+    proxy_set_header Host $http_host;
+    #proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    # WebSocket support
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+  }
+}
