@@ -44,6 +44,7 @@ server {
   }
   location /api {
     rewrite ^/api(/.*)$ $1 break;
+    rewrite ^/api$ /$1 break;
     proxy_pass http://${BACKEND_PROXY};
     proxy_set_header Host $http_host;
     #proxy_set_header Host $host;
