@@ -34,10 +34,12 @@ To run the NginxCrypt application in production:
 1. Install Docker (optionally with [this](https://github.com/daverolo/helpers/blob/main/global/installdocker.sh) helper script)
 2. Download the [docker-compose.yaml](./docker-compose.yaml) file into a newly created and empty directory
 3. Download the [.env.example](./.env.example) file as `.env` into the same directory.
-4. Set `NXCT_SERVICE_HOST_1` in `.env` to the IP address of your machine.
-5. Run the app via `sudo docker compose up -d`
-6. Monitor the app via `sudo docker compose logs -f`
-7. Stop the app via `sudo docker compose down`
+4. Download the [demo_frontend.sh](./demo_frontend.sh) into the same directory.
+5. Download the [demo_backend.sh](./demo_backend.sh) into the same directory.
+6. Set `NXCT_SERVICE_HOST_1` in `.env` to the IP address of your machine.
+7. Run the app via `sudo docker compose up -d`
+8. Monitor the app via `sudo docker compose logs -f`
+9. Stop the app via `sudo docker compose down`
 
 The steps above will run a Nginx reverse proxy using the `stereum/nginxcrypt:latest` Docker image with a demo frontend available thru https://MACHINE_IP and a demo backend available thru https://MACHINE_IP/api.
 
