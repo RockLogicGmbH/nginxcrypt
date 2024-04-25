@@ -57,6 +57,22 @@ This will automatically generate Let's Encrypt certificates for your domain if t
 
 Now it's time to read further and continue the detailed [configuration](#configuration) to point your reverse proxy to the target of your choice using `NXCT_SERVICE_PROXY_N` or `NXCT_SERVICE_FRONTEND_TARGET_N` and `NXCT_SERVICE_BACKEND_TARGET_N` config [options](#options).
 
+As soon as the configuration is done, the following steps are highly recommended:
+
+1. Stop the demo frontend and backend services via `sudo docker compose down frontend backend`
+2. Open your local `docker-compose.yaml` and comment out the demo frontend and backend containers.
+3. Do a backup of the whole `proxy` folder to keep your certs on an extra location in case the auto-renewal (unexpectedly) fails.
+
+This is a minimalistic approach for such backup task:
+
+```
+cd ~/proxy
+sudo mkdir -p ~/backups
+sudo cp -rp ~/proxy ~/backups/$(date +"%Y%m%d%H%M%S")-proxy
+```
+
+> Optionally add this to a script, e.g: `backup.sh` and run regularly as cron.
+
 ## Configuration
 
 The NginxCrypt application [options](#options) must be configured thru [environment variables](#environment-variables).
