@@ -41,7 +41,7 @@ To run the NginxCrypt application in production:
 8. Monitor the app via `sudo docker compose logs -f`
 9. Stop the app via `sudo docker compose down`
 
-The steps above will run a Nginx reverse proxy using the `stereum/nginxcrypt:latest` Docker image with a demo frontend available thru https://MACHINE_IP.
+The steps above will run a Nginx reverse proxy using the `rocklogicgmbh/nginxcrypt:latest` Docker image with a demo frontend available thru https://MACHINE_IP.
 
 If you wanna go for the advanced example that also has a demo backend available thru https://MACHINE_IP/api, just specify `NXCT_SERVICE_FRONTEND_TARGET_1=frontend:80` **and** `NXCT_SERVICE_BACKEND_TARGET_1=backend:80` in the `.env` file and run `sudo docker compose down ; sudo docker compose up -d`.
 
@@ -200,7 +200,7 @@ version: "3.7"
 services:
   proxy:
     container_name: proxy
-    image: stereum/nginxcrypt:latest
+    image: rocklogicgmbh/nginxcrypt:latest
     restart: always
     ports:
       - "80:80"

@@ -29,7 +29,7 @@ services:
   # Build locally with: docker compose build proxy
   proxy:
     container_name: proxy
-    image: stereum/nginxcrypt:latest
+    image: rocklogicgmbh/nginxcrypt:latest
     #restart: always
     ports:
       - "80:80"
