@@ -102,7 +102,7 @@ do
       certSubj=${!subj}
     fi
     mkdir -vp /certs/${!host}
-    /usr/bin/openssl genrsa -out /certs/${!host}/key.pem 1024
+    /usr/bin/openssl genrsa -out /certs/${!host}/key.pem $keyLength
     /usr/bin/openssl req -new -key /certs/${!host}/key.pem \
             -out /certs/${!host}/cert.csr \
             -subj "$certSubj"
