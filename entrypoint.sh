@@ -11,6 +11,7 @@ DEFAULT_NXCT_SERVICE_BACKEND_TARGET="backend:80"
 DEFAULT_NXCT_SERVICE_ALLOW_LOCAL_HOST_AND_ADDR=true
 
 # Define a default key length for the certificate, and use the parameter if set
+# Set it to 2048 at least!
 keyLength=4096
 if [ -n "$NXCT_SERVICE_KEYLENGTH" ]; then
   keyLength=$NXCT_SERVICE_KEYLENGTH
@@ -23,8 +24,8 @@ if [ -n "$NXCT_SERVICE_DRYRUN" ]; then
 fi
 
 # Define a default DH params length, and use the parameter if set
-# 1024 length is set for test purposes only, please set it to 2048 at least!
-dhParamLength=1024
+# Set it to 2048 at least!
+dhParamLength=2048
 if [ -n "$NXCT_SERVICE_DHPARAM" ]; then
   dhParamLength=$NXCT_SERVICE_DHPARAM
 fi

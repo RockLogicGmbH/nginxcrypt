@@ -83,7 +83,7 @@ The NginxCrypt application [options](#options) must be configured thru [environm
 | --------------------------------- | ------------- | -------- | ------------------------------------------------------------------------ |
 | NXCT_SERVICE_KEYLENGTH            | 4096          | No       | Key length[1] of your Let's Encrypt certificates                         |
 | NXCT_SERVICE_EMAIL                | ""            | No       | Optional e-mail address used to register with ZeroSSL                    |
-| NXCT_SERVICE_DHPARAM              | 1024[2]       | No       | Diffie-Hellman parameters key length (Generation can use much time![3])  |
+| NXCT_SERVICE_DHPARAM              | 2048[2]       | No       | Diffie-Hellman parameters key length (Generation can use much time![3])  |
 | NXCT_SERVICE_DRYRUN               | false         | No       | Set true to use the staging Let's Encrypt environment during your tests. |
 | NXCT_SERVICE_DELTEOUTDATEDCERTS   | false         | No       | Set true to delete previously generated certs of none existent hosts     |
 | NXCT_SERVICE_CERTDIRPERMS         | 777[4]        | No       | Permissions of the directory where certs are stored                      |
@@ -94,7 +94,7 @@ The NginxCrypt application [options](#options) must be configured thru [environm
 
 > [1]: 1024, 2048, 4096, ec-256, ec-384, ec-521 [not supported by LE yet], etc.
 
-> [2]: 1024 length for Diffie-Hellman parameters key is set for test purposes only, please set it to 2048 at least!
+> [2]: Diffie-Hellman parameters key length must be 2048 at least!
 
 > [3]: Be aware that generation of the Diffie-Hellman parameters key can take much time, **way more than just a couple minutes**.
 
