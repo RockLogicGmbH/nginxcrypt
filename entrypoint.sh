@@ -22,6 +22,88 @@ else
   NXCT_SERVICE_DELTEOUTDATEDCERTS="yes"
 fi
 
+# Set NXCT_SERVICE_ALLOWUNKNOWNDOMAINS to "no" if it is explicitly "false", "no", empty, or not set.
+# Set it to "yes" otherwise
+NXCT_SERVICE_ALLOWUNKNOWNDOMAINS="${NXCT_SERVICE_ALLOWUNKNOWNDOMAINS,,}"
+if [ -z "$NXCT_SERVICE_ALLOWUNKNOWNDOMAINS" ] || [ "$NXCT_SERVICE_ALLOWUNKNOWNDOMAINS" = "false" ] || [ "$NXCT_SERVICE_ALLOWUNKNOWNDOMAINS" = "no" ]; then
+  NXCT_SERVICE_ALLOWUNKNOWNDOMAINS="no"
+else
+  NXCT_SERVICE_ALLOWUNKNOWNDOMAINS="yes"
+fi
+
+#
+# FUNCTIONS
+#
+
+# Get public IP address (from multiple different services to also validate it)
+get_public_ip(){
+  if ! public_ip_svc1=$(dig +short myip.opendns.com @resolver1.opendns.com); then
+    return 1
+  fi
+  if ! public_ip_svc2=$(curl -s https://api.ipify.org); then
+    return 2
+  fi
+  if [ "$public_ip_svc1" != "$public_ip_svc2" ]; then
+    return 3
+  fi
+  echo "$public_ip_svc1"
+  return 0
+}
+
+# Get the domain's IP address(es) from DNS
+# $1 = The domain to get IP address(es) from
+get_domain_ips_from_dns(){
+  local DOMAIN="$1"
+  local domain_ips=$(dig +short "$DOMAIN" | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}')
+  if [ -z "$domain_ips" ]; then
+    return 1
+  fi
+  echo "$domain_ips"
+  return 0
+}
+
+# Check if public IP is in domain IPs
+# $1 = The public IP retrieved by "get_public_ip"
+# $2 = The domain IPs retrieved by "get_domain_ips_from_dns"
+is_public_ip_in_domain_ips(){
+  local public_ip="$1"
+  local domain_ips="$2"
+  local domain_ip=""
+  for domain_ip in $domain_ips; do
+    if [ "$public_ip" = "$domain_ip" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Check if given domain is ponted to the local machine
+# $1 = The domain to check
+is_domain_pointed_to_local_machine(){
+  local DOMAIN="$1"
+  if [ -z "$DOMAIN" ]; then
+    #echo "No domain given"
+    return 1
+  fi
+  # Get public machine IP
+  if ! public_ip=$(get_public_ip); then
+    #echo "Unable to get public IP address of local machine."
+    return 2
+  fi
+  # Get domain IPs
+  if ! domain_ips=$(get_domain_ips_from_dns "$DOMAIN"); then
+    #echo "Unable to resolve IP addresses for $DOMAIN."
+    return 3
+  fi
+  # Check if the public machine IP matches any of the domain IPs
+  if ! is_public_ip_in_domain_ips "$public_ip" "$domain_ips"; then
+    #echo "Domain $DOMAIN is NOT pointed to the local machine."
+    return 4
+  fi
+  #echo "Domain $DOMAIN is pointed to the local machine."
+  return 0
+}
+
 #
 # MAIN FLOW
 #
@@ -203,6 +285,10 @@ fi
 for service in $services
 do
   host="NXCT_SERVICE_HOST_$service"
+  if ! is_domain_pointed_to_local_machine "${!host}" && [ "$NXCT_SERVICE_ALLOWUNKNOWNDOMAINS" != "yes" ]; then
+    echo "Ignoring Let's Encrypt certificate request for host ${!host} (domain NOT pointed to the local machine)"
+    continue
+  fi
   certSubject=`/usr/bin/openssl x509 -subject -noout -in /certs/${!host}/cert.pem | /usr/bin/cut -c9-999`
   certIssuer=`/usr/bin/openssl x509 -issuer -noout -in /certs/${!host}/cert.pem | /usr/bin/cut -c8-999`
   # Checking whether the existent certificate is self-signed or not

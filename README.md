@@ -86,6 +86,7 @@ The NginxCrypt application [options](#options) must be configured thru [environm
 | NXCT_SERVICE_DHPARAM              | 2048[2]       | No       | Diffie-Hellman parameters key length (Generation can use much time![3])  |
 | NXCT_SERVICE_DRYRUN               | false         | No       | Set true to use the staging Let's Encrypt environment during your tests. |
 | NXCT_SERVICE_DELTEOUTDATEDCERTS   | false         | No       | Set true to delete previously generated certs of none existent hosts     |
+| NXCT_SERVICE_ALLOWUNKNOWNDOMAINS  | false         | No       | Set true to allow Let's Encrypt certificate requests for unknown domains |
 | NXCT_SERVICE_CERTDIRPERMS         | 777[4]        | No       | Permissions of the directory where certs are stored                      |
 | NXCT_SERVICE_HOST_N               | ""            | No       | Domain the certs should be created for (count up "N", start with 1)      |
 | NXCT_SERVICE_PROXY_N[5]           | "frontend:80" | No       | Any proxy target associated to NXCT_SERVICE_HOST_N (for "min" template)  |
@@ -123,6 +124,7 @@ Example `.env.example` (see [.env.example](./.env.example)):
 # NXCT_SERVICE_DHPARAM=2048
 # NXCT_SERVICE_DRYRUN=true
 # NXCT_SERVICE_DELTEOUTDATEDCERTS=false
+# NXCT_SERVICE_ALLOWUNKNOWNDOMAINS=false
 # NXCT_SERVICE_CERTDIRPERMS=777
 # NXCT_SERVICE_HOST_1=min.template.public-domain.tld
 # NXCT_SERVICE_PROXY_1=frontend:80
@@ -232,6 +234,7 @@ services:
     #   - NXCT_SERVICE_DHPARAM=2048 # default 2048 (and must be 2048 at least!)
     #   - NXCT_SERVICE_DRYRUN=true
     #   - NXCT_SERVICE_DELTEOUTDATEDCERTS=true # default false
+    #   - NXCT_SERVICE_ALLOWUNKNOWNDOMAINS=false
     #   - NXCT_SERVICE_CERTDIRPERMS=600 # default 777 (use 600 or similar in production)
     #   - NXCT_SERVICE_HOST_1=min.template.public-domain.tld
     #   - NXCT_SERVICE_PROXY_1=frontend:80

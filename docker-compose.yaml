@@ -45,6 +45,7 @@ services:
     #   - NXCT_SERVICE_DHPARAM=2048 # default 2048 (and must be 2048 at least!)
     #   - NXCT_SERVICE_DRYRUN=true
     #   - NXCT_SERVICE_DELTEOUTDATEDCERTS=true # default false
+    #   - NXCT_SERVICE_ALLOWUNKNOWNDOMAINS=false
     #   - NXCT_SERVICE_CERTDIRPERMS=600 # default 777 (use 600 or similar in production)
     #   - NXCT_SERVICE_HOST_1=min.template.public-domain.tld
     #   - NXCT_SERVICE_PROXY_1=frontend:80
