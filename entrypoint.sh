@@ -1,14 +1,40 @@
 #!/bin/bash
 
+#
+# HANDLE PSUEDO BOOLEANS
+#
+
+# Set NXCT_SERVICE_DRYRUN to "no" if it is explicitly "false", "no", empty, or not set.
+# Set it to "yes" otherwise
+NXCT_SERVICE_DRYRUN="${NXCT_SERVICE_DRYRUN,,}"
+if [ -z "$NXCT_SERVICE_DRYRUN" ] || [ "$NXCT_SERVICE_DRYRUN" = "false" ] || [ "$NXCT_SERVICE_DRYRUN" = "no" ]; then
+  NXCT_SERVICE_DRYRUN="no"
+else
+  NXCT_SERVICE_DRYRUN="yes"
+fi
+
+# Set NXCT_SERVICE_DELTEOUTDATEDCERTS to "no" if it is explicitly "false", "no", empty, or not set.
+# Set it to "yes" otherwise
+NXCT_SERVICE_DELTEOUTDATEDCERTS="${NXCT_SERVICE_DELTEOUTDATEDCERTS,,}"
+if [ -z "$NXCT_SERVICE_DELTEOUTDATEDCERTS" ] || [ "$NXCT_SERVICE_DELTEOUTDATEDCERTS" = "false" ] || [ "$NXCT_SERVICE_DELTEOUTDATEDCERTS" = "no" ]; then
+  NXCT_SERVICE_DELTEOUTDATEDCERTS="no"
+else
+  NXCT_SERVICE_DELTEOUTDATEDCERTS="yes"
+fi
+
+#
+# MAIN FLOW
+#
+
 # Define default host and frontend/backend proxy (used in case none was given by environment vars)
 DEFAULT_NXCT_SERVICE_HOST="localhost"
 DEFAULT_NXCT_SERVICE_FRONTEND_TARGET="frontend:80"
 DEFAULT_NXCT_SERVICE_BACKEND_TARGET="backend:80"
 
 # If no NXCT_SERVICE_HOST was specified and DEFAULT_NXCT_SERVICE_HOST is set to "localhost" or "127.0.0.1":
-# True = Accept connection from both, 127.0.0.1 and localhost
-# False = Accept connection only from the given host
-DEFAULT_NXCT_SERVICE_ALLOW_LOCAL_HOST_AND_ADDR=true
+# "yes" = Accept connection from both, 127.0.0.1 and localhost
+# "no"  = Accept connection only from the given host
+DEFAULT_NXCT_SERVICE_ALLOW_LOCAL_HOST_AND_ADDR="yes"
 
 # Define a default key length for the certificate, and use the parameter if set
 # Set it to 2048 at least!
@@ -19,7 +45,7 @@ fi
 
 # Should we execute everything on LE's staging platform?
 test=""
-if [ -n "$NXCT_SERVICE_DRYRUN" ]; then
+if [ "$NXCT_SERVICE_DRYRUN" = "yes" ]; then
   test="--test"
 fi
 
@@ -34,22 +60,22 @@ fi
 services=$(env | grep NXCT_SERVICE_HOST_ | cut -d "=" -f1 | sed 's/^NXCT_SERVICE_HOST_//')
 
 # Check if at least one NXCT_SERVICE_HOST_$service exists
-hosts_exist=false
+hosts_exist="no"
 for service in $services
 do
   host="NXCT_SERVICE_HOST_$service"
   if [ ! -z "${!host}" ]; then
-    hosts_exist=true
+    hosts_exist="yes"
     break
   fi
 done
 
 # Generate defaults if no NXCT_SERVICE_HOST_$service exists
-if [ "$hosts_exist" = false ]; then
+if [ "$hosts_exist" = "no" ]; then
   export NXCT_SERVICE_HOST_1="$DEFAULT_NXCT_SERVICE_HOST"
   export NXCT_SERVICE_FRONTEND_TARGET_1="$DEFAULT_NXCT_SERVICE_FRONTEND_TARGET"
   export NXCT_SERVICE_BACKEND_TARGET_1="$DEFAULT_NXCT_SERVICE_BACKEND_TARGET"
-  if [ "$DEFAULT_NXCT_SERVICE_ALLOW_LOCAL_HOST_AND_ADDR" = true ]; then
+  if [ "$DEFAULT_NXCT_SERVICE_ALLOW_LOCAL_HOST_AND_ADDR" = "yes" ]; then
     if [ "$DEFAULT_NXCT_SERVICE_HOST" == "localhost" ]; then
       export NXCT_SERVICE_HOST_2="127.0.0.1"
       export NXCT_SERVICE_FRONTEND_TARGET_2="$DEFAULT_NXCT_SERVICE_FRONTEND_TARGET"
@@ -64,22 +90,22 @@ if [ "$hosts_exist" = false ]; then
 fi
 
 # Delete existing certs of undefined hosts
-if [ -n "$NXCT_SERVICE_DELTEOUTDATEDCERTS" ]; then
+if [ "$NXCT_SERVICE_DELTEOUTDATEDCERTS" = "yes" ]; then
   for dir in /certs/*/; do
     # Get the basename of the directory
     dir_basename=$(basename "$dir")
-    exists=false
+    exists="no"
     for service in $services
     do
       host="NXCT_SERVICE_HOST_$service"
       name=${!host}
       if [ "$dir_basename" == "$name" ]; then
-        exists=true
+        exists="yes"
         break
       fi
     done
-    if [ $exists = false ]; then
-      if [ -n "$NXCT_SERVICE_DRYRUN" ]; then
+    if [ $exists = "no" ]; then
+      if [ "$NXCT_SERVICE_DRYRUN" = "yes" ]; then
         echo "[DRY-RUN] Deleting certs of undefined host '$dir_basename'"
       else
         echo "Deleting certs of undefined host '$dir_basename' ($dir)"
