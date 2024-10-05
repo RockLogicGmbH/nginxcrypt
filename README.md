@@ -92,7 +92,7 @@ The NginxCrypt application [options](#options) must be configured thru [environm
 | NXCT_SERVICE_FRONTEND_TARGET_N[6] | "frontend:80" | No       | Frontend target associated to NXCT_SERVICE_HOST_N (for "api" template)   |
 | NXCT_SERVICE_BACKEND_TARGET_N[6]  | "backend:80"  | No       | Backend target associated to NXCT_SERVICE_HOST_N (for "api" template)    |
 
-> [1]: 1024, 2048, 4096, ec-256, ec-384, ec-521 [not supported by LE yet], etc.
+> [1]: 2048, 4096, ec-256, ec-384, ec-521 [not supported by LE yet], etc. (must be 2048 at least!)
 
 > [2]: Diffie-Hellman parameters key length must be 2048 at least!
 
@@ -118,7 +118,7 @@ Example `.env.example` (see [.env.example](./.env.example)):
 
 ```
 # CONFIG ENV FILE
-# NXCT_SERVICE_KEYLENGTH=ec-384
+# NXCT_SERVICE_KEYLENGTH=4096
 # NXCT_SERVICE_EMAIL=your@email.tld
 # NXCT_SERVICE_DHPARAM=2048
 # NXCT_SERVICE_DRYRUN=true
@@ -182,7 +182,7 @@ cd nginxcrypt
 Build the container:
 
 ```
-docker compose build proxy
+sudo docker compose build proxy
 ```
 
 Start:
@@ -222,25 +222,25 @@ services:
       - "80:80"
       - "443:443"
     # tty: true # only needed for zerossl if NXCT_SERVICE_EMAIL is given (currently disabled anyway!)
-    env_file: .env
     volumes:
       - ./.volumes/proxy/certs:/certs
       - ./.volumes/proxy/conf:/conf
-    environment:
-      # - NXCT_SERVICE_KEYLENGTH=ec-384
-      # - NXCT_SERVICE_EMAIL=your@email.tld
-      # - NXCT_SERVICE_DHPARAM=2048
-      # - NXCT_SERVICE_DRYRUN=true
-      # - NXCT_SERVICE_DELTEOUTDATEDCERTS=true
-      # - NXCT_SERVICE_CERTDIRPERMS=600
-      # - NXCT_SERVICE_HOST_1=min.template.public-domain.tld
-      # - NXCT_SERVICE_PROXY_1=frontend:80
-      # - NXCT_SERVICE_HOST_2=api.template.public-domain.tld
-      # - NXCT_SERVICE_FRONTEND_TARGET_2=frontend:80
-      # - NXCT_SERVICE_BACKEND_TARGET_2=backend:80
-      # - NXCT_SERVICE_HOST_3=onemore.api.template.public-domain.tld
-      # - NXCT_SERVICE_FRONTEND_TARGET_3=frontend:80
-      # - NXCT_SERVICE_BACKEND_TARGET_3=backend:80
+    env_file: .env
+    # environment:
+    #   - NXCT_SERVICE_KEYLENGTH=4096 # default 4096 (and must be 2048 at least!)
+    #   - NXCT_SERVICE_EMAIL=your@email.tld
+    #   - NXCT_SERVICE_DHPARAM=2048 # default 2048 (and must be 2048 at least!)
+    #   - NXCT_SERVICE_DRYRUN=true
+    #   - NXCT_SERVICE_DELTEOUTDATEDCERTS=true # default false
+    #   - NXCT_SERVICE_CERTDIRPERMS=600 # default 777 (use 600 or similar in production)
+    #   - NXCT_SERVICE_HOST_1=min.template.public-domain.tld
+    #   - NXCT_SERVICE_PROXY_1=frontend:80
+    #   - NXCT_SERVICE_HOST_2=api.template.public-domain.tld
+    #   - NXCT_SERVICE_FRONTEND_TARGET_2=frontend:80
+    #   - NXCT_SERVICE_BACKEND_TARGET_2=backend:80
+    #   - NXCT_SERVICE_HOST_3=onemore.api.template.public-domain.tld
+    #   - NXCT_SERVICE_FRONTEND_TARGET_3=frontend:80
+    #   - NXCT_SERVICE_BACKEND_TARGET_3=backend:80
     extra_hosts:
       - "host.docker.internal:host-gateway" # required on Linux!
 ```

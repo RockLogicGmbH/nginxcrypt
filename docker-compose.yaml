@@ -39,20 +39,20 @@ services:
       - ./.volumes/proxy/certs:/certs
       - ./.volumes/proxy/conf:/conf
     env_file: .env
-    environment:
-      - NXCT_SERVICE_KEYLENGTH=ec-384
-      # - NXCT_SERVICE_EMAIL=your@email.tld
-      # - NXCT_SERVICE_DHPARAM=2048 # default 1024 (use min 2024 in production!9)
-      # - NXCT_SERVICE_DRYRUN=true
-      # - NXCT_SERVICE_DELTEOUTDATEDCERTS=true # default false
-      # - NXCT_SERVICE_CERTDIRPERMS=600 # default 777 (use 600 or similar in production)
-      # - NXCT_SERVICE_HOST_1=min.template.public-domain.tld
-      # - NXCT_SERVICE_PROXY_1=frontend:80
-      # - NXCT_SERVICE_HOST_2=api.template.public-domain.tld
-      # - NXCT_SERVICE_FRONTEND_TARGET_2=frontend:80
-      # - NXCT_SERVICE_BACKEND_TARGET_2=backend:80
-      # - NXCT_SERVICE_HOST_3=onemore.api.template.public-domain.tld
-      # - NXCT_SERVICE_FRONTEND_TARGET_3=frontend:80
-      # - NXCT_SERVICE_BACKEND_TARGET_3=backend:80
+    # environment:
+    #   - NXCT_SERVICE_KEYLENGTH=4096 # default 4096 (and must be 2048 at least!)
+    #   - NXCT_SERVICE_EMAIL=your@email.tld
+    #   - NXCT_SERVICE_DHPARAM=2048 # default 2048 (and must be 2048 at least!)
+    #   - NXCT_SERVICE_DRYRUN=true
+    #   - NXCT_SERVICE_DELTEOUTDATEDCERTS=true # default false
+    #   - NXCT_SERVICE_CERTDIRPERMS=600 # default 777 (use 600 or similar in production)
+    #   - NXCT_SERVICE_HOST_1=min.template.public-domain.tld
+    #   - NXCT_SERVICE_PROXY_1=frontend:80
+    #   - NXCT_SERVICE_HOST_2=api.template.public-domain.tld
+    #   - NXCT_SERVICE_FRONTEND_TARGET_2=frontend:80
+    #   - NXCT_SERVICE_BACKEND_TARGET_2=backend:80
+    #   - NXCT_SERVICE_HOST_3=onemore.api.template.public-domain.tld
+    #   - NXCT_SERVICE_FRONTEND_TARGET_3=frontend:80
+    #   - NXCT_SERVICE_BACKEND_TARGET_3=backend:80
     extra_hosts:
       - "host.docker.internal:host-gateway" # required on Linux!
