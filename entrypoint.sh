@@ -35,6 +35,28 @@ fi
 # FUNCTIONS
 #
 
+# output default message
+say() {
+    echo "$@"
+}
+
+# exit script with error message and error code
+die() {
+    echo "$@" >&2
+    exit 3
+}
+
+# trim whitespaces
+# example: myvar=$(trim "$myvar")
+trim() {
+    local var="$*"
+    # remove leading whitespace characters
+    var="${var#"${var%%[![:space:]]*}"}"
+    # remove trailing whitespace characters
+    var="${var%"${var##*[![:space:]]}"}"   
+    echo -n "$var"
+}
+
 # Get public IP address (from multiple different services to also validate it)
 get_public_ip(){
   if ! public_ip_svc1=$(dig +short myip.opendns.com @resolver1.opendns.com); then
@@ -102,6 +124,32 @@ is_domain_pointed_to_local_machine(){
   fi
   #echo "Domain $DOMAIN is pointed to the local machine."
   return 0
+}
+
+# Get curve name from curve key
+# $1 = Curve key: ec-256, ec-384, ec-521
+get_ec_curve_name() {
+    local ec_key="$1"
+
+    # Extract the numeric part of the curve size (256, 384, 521)
+    local curve_size=${ec_key#ec-}
+
+    # Map curve size to the appropriate curve name
+    case $curve_size in
+        256)
+            echo "secp256r1"
+            ;;
+        384)
+            echo "secp384r1"
+            ;;
+        521)
+            echo "secp521r1"
+            ;;
+        *)
+            #echo "Unsupported EC curve size: $curve_size" >&2
+            return 1
+            ;;
+    esac
 }
 
 #
@@ -211,7 +259,14 @@ do
       certSubj=${!subj}
     fi
     mkdir -vp /certs/${!host}
-    /usr/bin/openssl genrsa -out /certs/${!host}/key.pem $keyLength
+    if [[ $keyLength == ec-* ]]; then
+      if ! curveName=$(get_ec_curve_name "$keyLength"); then
+        die "ERROR: Unsupported EC curve size: $curve_size"
+      fi
+      /usr/bin/openssl ecparam -name $curveName -genkey -noout -out /certs/${!host}/key.pem
+    else
+      /usr/bin/openssl genrsa -out /certs/${!host}/key.pem $keyLength
+    fi
     /usr/bin/openssl req -new -key /certs/${!host}/key.pem \
             -out /certs/${!host}/cert.csr \
             -subj "$certSubj"
