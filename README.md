@@ -119,7 +119,7 @@ Example `.env.example` (see [.env.example](./.env.example)):
 
 ```
 # CONFIG ENV FILE
-# NXCT_SERVICE_KEYLENGTH=4096
+# NXCT_SERVICE_KEYLENGTH=ec-384
 # NXCT_SERVICE_EMAIL=your@email.tld
 # NXCT_SERVICE_DHPARAM=2048
 # NXCT_SERVICE_DRYRUN=true
@@ -229,7 +229,7 @@ services:
       - ./.volumes/proxy/conf:/conf
     env_file: .env
     # environment:
-    #   - NXCT_SERVICE_KEYLENGTH=4096 # default 4096 (and must be 2048 at least!)
+    #   - NXCT_SERVICE_KEYLENGTH=ec-384 # default 4096 (and must be 2048 at least!)
     #   - NXCT_SERVICE_EMAIL=your@email.tld
     #   - NXCT_SERVICE_DHPARAM=2048 # default 2048 (and must be 2048 at least!)
     #   - NXCT_SERVICE_DRYRUN=true

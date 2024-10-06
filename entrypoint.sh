@@ -152,6 +152,45 @@ get_ec_curve_name() {
     esac
 }
 
+# Get certificate key size from existing key file
+# $1 = Path to fullchain.pem file
+get_key_size(){
+  local fullchainpem="$1"
+
+  algo=$(openssl x509 -in "$fullchainpem" -noout -text | grep "Public Key Algorithm" | awk '{print $4}')
+
+
+
+  if ! key_size=$(openssl x509 -in $fullchainpem -noout -text | grep 'Public-Key' | awk -F'[()]' '{print $2}' | awk '{print $1}'); then
+    return 1
+  fi
+  echo "$key_size"
+  return 0
+}
+
+# Get certificate key algorithm from existing key file
+# $1 = Path to fullchain.pem file
+# Returns key algo like 'RSA' or 'id-ecPublicKey' and so on...
+get_key_algo(){
+  local fullchainpem="$1"
+  if ! key_algo=$(openssl x509 -in "$fullchainpem" -noout -text | grep "Public Key Algorithm" | awk '{print $4}'); then
+    return 1
+  fi
+  echo "$key_algo"
+  return 0
+}
+
+# Get DH params key size from existing key file
+# $1 = Path to dhparam.pem file
+get_dh_key_size(){
+  local dhparampem="$1"
+  if ! dh_key_size=$(openssl dhparam -in $dhparampem -noout -text | grep 'DH Parameters'  | awk -F'[()]' '{print $2}' | awk '{print $1}'); then
+    return 1
+  fi
+  echo "$dh_key_size"
+  return 0
+}
+
 #
 # MAIN FLOW
 #
@@ -170,6 +209,18 @@ DEFAULT_NXCT_SERVICE_ALLOW_LOCAL_HOST_AND_ADDR="yes"
 # Set it to 2048 at least!
 keyLength=4096
 if [ -n "$NXCT_SERVICE_KEYLENGTH" ]; then
+  if [[ $NXCT_SERVICE_KEYLENGTH == ec-* ]]; then
+      if ! curveName=$(get_ec_curve_name "$NXCT_SERVICE_KEYLENGTH"); then
+        die "ERROR: NXCT_SERVICE_KEYLENGTH is an unsupported EC curve size: $NXCT_SERVICE_KEYLENGTH"
+      fi
+  else
+    if ! [[ "$NXCT_SERVICE_KEYLENGTH" =~ ^[0-9]+$ ]]; then
+      die "ERROR: NXCT_SERVICE_KEYLENGTH is not a valid numeric value: $NXCT_SERVICE_KEYLENGTH"
+    fi
+    if [ "$NXCT_SERVICE_KEYLENGTH" -lt 2048 ]; then
+      die "ERROR: NXCT_SERVICE_KEYLENGTH $NXCT_SERVICE_KEYLENGTH is lower than 2048!"
+    fi
+  fi
   keyLength=$NXCT_SERVICE_KEYLENGTH
 fi
 
@@ -183,6 +234,12 @@ fi
 # Set it to 2048 at least!
 dhParamLength=2048
 if [ -n "$NXCT_SERVICE_DHPARAM" ]; then
+  if ! [[ "$NXCT_SERVICE_DHPARAM" =~ ^[0-9]+$ ]]; then
+    die "ERROR: NXCT_SERVICE_DHPARAM is not a valid numeric value: $NXCT_SERVICE_DHPARAM"
+  fi
+  if [ "$NXCT_SERVICE_DHPARAM" -lt 2048 ]; then
+    die "ERROR: NXCT_SERVICE_DHPARAM $NXCT_SERVICE_DHPARAM is lower than 2048!"
+  fi
   dhParamLength=$NXCT_SERVICE_DHPARAM
 fi
 
@@ -250,6 +307,24 @@ for service in $services
 do
   host="NXCT_SERVICE_HOST_$service"
   subj="NXCT_SERVICE_SUBJ_$service"
+
+  # Make sure certificates are re-generated if minimum key sizes does not fit anymore (for example due to NGINX upgrades)
+  if [ -s "/certs/${!host}/fullchain.pem" ]; then
+    if ! key_size=$(get_key_size "/certs/${!host}/fullchain.pem"); then
+      die "ERROR: could not get key size from /certs/${!host}/fullchain.pem"
+    fi
+    if ! key_algo=$(get_key_algo "/certs/${!host}/fullchain.pem"); then
+      die "ERROR: could not get key algorithm from /certs/${!host}/fullchain.pem"
+    fi
+    if ( [ "$key_algo" == "rsaEncryption" ] || [ "$key_algo" == "RSA" ] ) && [ "$key_size" -lt 2048 ]; then
+      echo "WARNING: RSA key_size $key_size is lower than 2048, removing \"/certs/${!host}\" directory to re-generate certificates!"
+      rm -rf "/certs/${!host}"
+    elif ( [ "$key_algo" == "ecEncryption" ] || [ "$key_algo" == "id-ecPublicKey" ] || [[ "$key_algo" == secp* ]] || [[ "$alkey_algogo" == prime* ]]) && [ "$key_size" -lt 256 ]; then
+      echo "WARNING: EC key_size $key_size is lower than 256, removing \"/certs/${!host}\" directory to re-generate certificates!"
+      rm -rf "/certs/${!host}"
+    fi
+  fi
+
   # if [[ ! -d "/certs/${!host}"  || ! -s "/certs/${!host}/cert.pem" ]]; then # only generates a new self-signed if cert.pem not empty
   if [[ ! -d "/certs/${!host}"  || ! -f "/certs/${!host}/cert.pem" ]]; then # only generates a new self-signed if cert.pem does not exist
     echo ""
@@ -261,7 +336,7 @@ do
     mkdir -vp /certs/${!host}
     if [[ $keyLength == ec-* ]]; then
       if ! curveName=$(get_ec_curve_name "$keyLength"); then
-        die "ERROR: Unsupported EC curve size: $curve_size"
+        die "ERROR: Unsupported EC curve size: $keyLength"
       fi
       /usr/bin/openssl ecparam -name $curveName -genkey -noout -out /certs/${!host}/key.pem
     else
@@ -280,7 +355,17 @@ do
   fi
 done
 
-# Generate the DH params file if it does not exist
+# Generate the DH params file if it does not exist or make sure it is re-generated
+# if the minimum key size does not fit anymore (for example due to NGINX upgrades)
+if [ -s "/certs/dhparam.pem" ]; then
+  if ! dh_key_size=$(get_dh_key_size "/certs/dhparam.pem"); then
+    die "ERROR: could not get DH key size"
+  fi
+  if [ "$dh_key_size" -lt 2048 ]; then
+    echo "WARNING: dh_key_size $dh_key_size is lower than 2048, removing \"/certs/dhparam.pem\" to re-generate it!"
+    rm -rf "/certs/dhparam.pem"
+  fi
+fi
 if [ ! -s "/certs/dhparam.pem" ]; then
   echo ""
   echo "Generating DH Parameters (length: $dhParamLength)..."
