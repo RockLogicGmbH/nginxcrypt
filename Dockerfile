@@ -2,7 +2,7 @@ FROM nginx:alpine
 
 VOLUME ["/certs", "/conf"]
 
-RUN apk add netcat-openbsd bc curl wget git bash openssl libressl
+RUN apk add netcat-openbsd bc curl wget git bash openssl libressl bind-tools
 
 RUN cd /tmp/ && git clone https://github.com/acmesh-official/acme.sh.git
 
