@@ -16,7 +16,7 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           push: false
-          tags: ${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:latest,${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:${{github.ref_name}}
+          tags: ${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:latest,${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:${{ replace(github.ref_name, '/', '-') }}
         if: startsWith(github.ref, 'refs/tags/v') == false
 
       - name: Login to DockerHub
@@ -30,5 +30,5 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           push: true
-          tags: ${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:latest,${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:${{github.ref_name}}
+          tags: ${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:latest,${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:${{ replace(github.ref_name, '/', '-') }}
         if: startsWith(github.ref, 'refs/tags/v')

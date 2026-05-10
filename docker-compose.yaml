@@ -29,8 +29,8 @@ services:
   # Build locally with: docker compose build proxy
   proxy:
     container_name: proxy
-    image: rocklogicgmbh/nginxcrypt:latest
-    #restart: always
+    image: neoplays/nginxcrypt:latest
+    restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
@@ -55,5 +55,5 @@ services:
     #   - NXCT_SERVICE_HOST_3=onemore.api.template.public-domain.tld
     #   - NXCT_SERVICE_FRONTEND_TARGET_3=frontend:80
     #   - NXCT_SERVICE_BACKEND_TARGET_3=backend:80
-    extra_hosts:
-      - "host.docker.internal:host-gateway" # required on Linux!
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway" # required on Linux!
