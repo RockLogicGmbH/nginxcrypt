@@ -450,7 +450,7 @@ do
                            --key-file /certs/${!host}/key.pem \
                            --fullchain-file /certs/${!host}/fullchain.pem \
 			   --cert-file /certs/${!host}/cert.pem \
-                           --reloadcmd '/usr/sbin/nginx -s stop && /bin/sleep 5s && /usr/sbin/nginx'
+                           --reloadcmd '/usr/sbin/nginx -s reload'
     touch /certs/${!host}/le-ok
     echo "Let's Encrypt certificate for ${!host} installed."
     echo ""
@@ -471,6 +471,9 @@ echo "Stopping Nginx that was running in daemon mode"
 
 # Sleep a few seconds before starting default Nginx
 /bin/sleep 5s
+
+# Start cron daemon for acme.sh auto-renewal
+/usr/sbin/crond -b -l 8
 
 # Start Nginx
 echo ""
