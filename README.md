@@ -92,6 +92,7 @@ The NginxCrypt application [options](#options) must be configured thru [environm
 | NXCT_SERVICE_PROXY_N[5]           | "frontend:80" | No       | Any proxy target associated to NXCT_SERVICE_HOST_N (for "min" template)  |
 | NXCT_SERVICE_FRONTEND_TARGET_N[6] | "frontend:80" | No       | Frontend target associated to NXCT_SERVICE_HOST_N (for "api" template)   |
 | NXCT_SERVICE_BACKEND_TARGET_N[6]  | "backend:80"  | No       | Backend target associated to NXCT_SERVICE_HOST_N (for "api" template)    |
+| NXCT_ALERT\*                      |               |          | [See alerting options below](#alerting)                                  |
 
 > [1]: 2048, 4096, ec-256, ec-384, ec-521 [not supported by LE yet], etc. (must be 2048 at least!)
 
@@ -111,6 +112,66 @@ If neither `NXCT_SERVICE_HOST_N` nor `NXCT_SERVICE_PROXY_N` or `NXCT_SERVICE_FRO
 
 Under the hood there is also one more key `NXCT_SERVICE_SUBJ_`: The self-signed certificate subject of `NXCT_SERVICE_HOST_N`. The expected format is the following: `/C=Country code/ST=State/L=City/O=Company/OU=Organization/CN=your.domain.tld`. It's not really useful, but still, it's there as a easter egg.
 
+#### Alerting
+
+NginxCrypt monitors all configured upstreams in the background and can send notifications to Discord and/or MS Teams when an upstream becomes unavailable. Alerting is opt-in - it is completely disabled unless at least one webhook URL is set.
+
+| Name                            | Default | Required | Description                                                                 |
+| ------------------------------- | ------- | -------- | --------------------------------------------------------------------------- |
+| NXCT_ALERT_DISCORD_WEBHOOK      | ""      | No       | Discord incoming webhook URL                                                |
+| NXCT_ALERT_MSTEAMS_WEBHOOK      | ""      | No       | MS Teams incoming webhook URL                                               |
+| NXCT_ALERT_THRESHOLD            | 60      | No       | Seconds an upstream must be unreachable before alerting                     |
+| NXCT_ALERT_INTERVAL             | 30      | No       | How often (in seconds) upstreams are checked                                |
+| NXCT_ALERT_COOLDOWN             | 600     | No       | Seconds between repeated alerts for the same upstream                       |
+| NXCT_ALERT_LOG_TIMESTAMP_FORMAT | ""      | No       | strftime format string prepended to container alerting-log lines (optional) |
+
+Alert messages include the upstream address, the domain(s) it serves, and the public IP of the host - for example:
+
+```
+Upstream frontend:80 serving rocklogic.at, stereum.com on host 1.2.3.4 has been unreachable for 90s.
+```
+
+A recovery notification is sent automatically when the upstream comes back online. Alert state is stored in `/certs/.nxct_monitor/` (the persistent certs volume), so recovery notifications are sent correctly even after a container restart.
+
+The upstream monitor runs as a background process managed by a cron watchdog - if it crashes it is automatically restarted within one minute. Monitor output is visible in `docker compose logs proxy`.
+
+By default alerting-log lines have no timestamp prefix. Set `NXCT_ALERT_LOG_TIMESTAMP_FORMAT` to a strftime format string to add one. For example, to match Nginx's own default log format exactly:
+
+```
+NXCT_ALERT_LOG_TIMESTAMP_FORMAT="%Y/%m/%d %H:%M:%S [notice] 1#1:"
+```
+
+This produces output like:
+
+```
+2026/05/22 08:46:00 [notice] 1#1: [upstream-monitor] UNREACHABLE: frontend:80 (serving: stereum.com) - down for 60s
+```
+
+**Discord** - how to get a `MESSENGER_DISCORD_WEBHOOK_URL` from your Discord server:
+
+1. Open your Discord server
+2. Go to the channel where you want error messages to be sent
+3. Click the gear icon next to the channel name to open channel settings
+4. Navigate to "Integrations" -> "Webhooks"
+5. Click "New Webhook"
+   - Name it (e.g., "🚨 NginxCrypt Alert Bot 🚨")
+   - Choose the channel to post in
+6. Click "Copy Webhook URL".
+   It will look like:
+   https://discord.com/api/webhooks/123456789012345678/abcdefGHIJKLMNOPQrstuv123456
+
+**MS Teams** - how to get a `MESSENGER_MSTEAMS_WEBHOOK_URL` from your MSTEAMS server:
+
+1. Open your MSTEAMS server
+2. Go to the channel where you want the alerts.
+3. Click "... (More options)" -> "Connectors".
+4. Find and click "Incoming Webhook", then:
+   - Give it a name (e.g. "🚨 NginxCrypt Alert Bot 🚨")
+   - Optionally upload an icon
+   - Click "Create"
+5. Copy the webhook URL - it looks like:
+   https://outlook.office.com/webhook/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX@YYYYYYYYY...
+
 ### Config file
 
 By default the NginxCrypt application attempts to read the configuration from an `.env` file where you add the [config options](#options).
@@ -119,6 +180,8 @@ Example `.env.example` (see [.env.example](./.env.example)):
 
 ```
 # CONFIG ENV FILE
+
+# General proxy settings
 # NXCT_SERVICE_KEYLENGTH=ec-384
 # NXCT_SERVICE_EMAIL=your@email.tld
 # NXCT_SERVICE_DHPARAM=2048
@@ -126,6 +189,8 @@ Example `.env.example` (see [.env.example](./.env.example)):
 # NXCT_SERVICE_DELTEOUTDATEDCERTS=false
 # NXCT_SERVICE_ALLOWUNKNOWNDOMAINS=false
 # NXCT_SERVICE_CERTDIRPERMS=777
+
+# Host configuration
 # NXCT_SERVICE_HOST_1=min.template.public-domain.tld
 # NXCT_SERVICE_PROXY_1=frontend:80
 # NXCT_SERVICE_HOST_2=api.template.public-domain.tld
@@ -134,6 +199,15 @@ Example `.env.example` (see [.env.example](./.env.example)):
 # NXCT_SERVICE_HOST_3=onemore.api.template.public-domain.tld
 # NXCT_SERVICE_FRONTEND_TARGET_3=frontend:80
 # NXCT_SERVICE_BACKEND_TARGET_3=backend:80
+
+# Alerting - send notifications to Discord and/or MS Teams when an upstream is unavailable.
+# At least one webhook URL must be set to enable alerting; all other vars are optional.
+# NXCT_ALERT_DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
+# NXCT_ALERT_MSTEAMS_WEBHOOK=https://outlook.office.com/webhook/...
+# NXCT_ALERT_THRESHOLD=60
+# NXCT_ALERT_INTERVAL=30
+# NXCT_ALERT_COOLDOWN=600
+# NXCT_ALERT_LOG_TIMESTAMP_FORMAT="%Y/%m/%d %H:%M:%S [notice] 1#1:"
 ```
 
 The config file is read from the `.env` file specified in the `docker-compose.yaml` for the `proxy` container which is by default the .env file in your NginxCrypt application root.
@@ -160,7 +234,7 @@ sudo docker compose down ; sudo docker compose up -d proxy
 
 Two volumes (by default located in `./volumes/proxy` on the host system) are used:
 
-- `/certs`: all the certificates will be stored here (including dhparam.pem). You do not need to put anything by yourself, the container will do it itself. However, you need to make sure the volume is mapped to your physical disk or the certificates will be generated on each restart of the container!
+- `/certs`: all the certificates will be stored here (including dhparam.pem). You do not need to put anything by yourself, the container will do it itself. However, you need to make sure the volume is mapped to your physical disk or the certificates will be generated on each restart of the container! The upstream monitor also stores its state in `/certs/.nxct_monitor/` so that alert and recovery state survives container restarts.
 
 - `/conf`: place your optional/additional Nginx configuration file(s) here in format `name[A-Z0-9].conf` (e.g: "server27.conf"). Do not use sole numeric definitions like "0.conf" since they are reserved for auto-generated configs, the rest is up to you.
 
@@ -229,6 +303,7 @@ services:
       - ./.volumes/proxy/conf:/conf
     env_file: .env
     # environment:
+    #   # General proxy settings
     #   - NXCT_SERVICE_KEYLENGTH=ec-384 # default 4096 (and must be 2048 at least!)
     #   - NXCT_SERVICE_EMAIL=your@email.tld
     #   - NXCT_SERVICE_DHPARAM=2048 # default 2048 (and must be 2048 at least!)
@@ -236,6 +311,7 @@ services:
     #   - NXCT_SERVICE_DELTEOUTDATEDCERTS=true # default false
     #   - NXCT_SERVICE_ALLOWUNKNOWNDOMAINS=false
     #   - NXCT_SERVICE_CERTDIRPERMS=600 # default 777 (use 600 or similar in production)
+    #   # Host configuration
     #   - NXCT_SERVICE_HOST_1=min.template.public-domain.tld
     #   - NXCT_SERVICE_PROXY_1=frontend:80
     #   - NXCT_SERVICE_HOST_2=api.template.public-domain.tld
@@ -244,6 +320,14 @@ services:
     #   - NXCT_SERVICE_HOST_3=onemore.api.template.public-domain.tld
     #   - NXCT_SERVICE_FRONTEND_TARGET_3=frontend:80
     #   - NXCT_SERVICE_BACKEND_TARGET_3=backend:80
+    #   # Alerting - send notifications to Discord and/or MS Teams when an upstream is unavailable.
+    #   # At least one webhook URL must be set to enable alerting; all other vars are optional.
+    #   # - NXCT_ALERT_DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
+    #   # - NXCT_ALERT_MSTEAMS_WEBHOOK=https://outlook.office.com/webhook/...
+    #   - NXCT_ALERT_THRESHOLD=60 # seconds an upstream must be down before alerting
+    #   - NXCT_ALERT_INTERVAL=30 # check interval in seconds
+    #   - NXCT_ALERT_COOLDOWN=600 # seconds between repeated alerts for the same upstream
+    #   - NXCT_ALERT_LOG_TIMESTAMP_FORMAT="%Y/%m/%d %H:%M:%S [notice] 1#1:" # strftime format string prepended to container alerting-log lines (optional)
     extra_hosts:
       - "host.docker.internal:host-gateway" # required on Linux!
 ```

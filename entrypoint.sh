@@ -472,8 +472,16 @@ echo "Stopping Nginx that was running in daemon mode"
 # Sleep a few seconds before starting default Nginx
 /bin/sleep 5s
 
-# Start cron daemon for acme.sh auto-renewal
+# Register upstream monitor watchdog in crontab (restarts it if it crashes)
+if ! crontab -l 2>/dev/null | grep -q "upstream_monitor.sh"; then
+  (crontab -l 2>/dev/null; echo "* * * * * pgrep -f upstream_monitor.sh > /dev/null || /root/.acme.sh/upstream_monitor.sh >> /proc/1/fd/1 2>> /proc/1/fd/2 &") | crontab -
+fi
+
+# Start cron daemon for acme.sh auto-renewal and upstream monitor watchdog
 /usr/sbin/crond -b -l 8
+
+# Start upstream monitor immediately (cron watchdog only kicks in after the first minute)
+/root/.acme.sh/upstream_monitor.sh &
 
 # Start Nginx
 echo ""

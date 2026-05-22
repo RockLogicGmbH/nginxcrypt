@@ -13,10 +13,11 @@ WORKDIR /root/.acme.sh/
 RUN mkdir -vp /var/www/html/.well-known/acme-challenge/
 
 COPY entrypoint.sh /root/.acme.sh/
+COPY upstream_monitor.sh /root/.acme.sh/
 
 COPY *.template /tmp
 
-RUN chmod +x /root/.acme.sh/entrypoint.sh
+RUN chmod +x /root/.acme.sh/entrypoint.sh /root/.acme.sh/upstream_monitor.sh
 
 RUN rm -rf /etc/nginx/conf.d && ln -s /conf /etc/nginx/conf.d
 
