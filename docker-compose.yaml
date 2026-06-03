@@ -29,8 +29,8 @@ services:
   # Build locally with: docker compose build proxy
   proxy:
     container_name: proxy
-    image: rocklogicgmbh/nginxcrypt:latest
-    #restart: always
+    image: neoplays/nginxcrypt:latest
+    restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
@@ -64,5 +64,5 @@ services:
     #   - NXCT_ALERT_THRESHOLD=60 # seconds an upstream must be down before alerting
     #   - NXCT_ALERT_INTERVAL=30 # check interval in seconds
     #   - NXCT_ALERT_COOLDOWN=600 # seconds between repeated alerts for the same upstream
-    extra_hosts:
-      - "host.docker.internal:host-gateway" # required on Linux!
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway" # required on Linux!
