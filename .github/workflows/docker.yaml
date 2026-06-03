@@ -42,4 +42,8 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
+          body: |
+            | Registry | Tag | Repository |
+            |---|---|---|
+            | <picture><source media="(prefers-color-scheme: dark)" srcset="https://cdn.simpleicons.org/docker/white"><source media="(prefers-color-scheme: light)" srcset="https://cdn.simpleicons.org/docker/black"><img src="https://cdn.simpleicons.org/docker/black" width="32" alt="Docker logo"></picture> | [${{ env.REF_SLUG }}](https://hub.docker.com/r/${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt/tags?name=${{ env.REF_SLUG }}) | [${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt](https://hub.docker.com/r/${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt) |
         if: startsWith(github.ref, 'refs/tags/v')
