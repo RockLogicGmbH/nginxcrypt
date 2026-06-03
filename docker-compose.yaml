@@ -40,6 +40,7 @@ services:
       - ./.volumes/proxy/conf:/conf
     env_file: .env
     # environment:
+    #   # General proxy settings
     #   - NXCT_SERVICE_KEYLENGTH=ec-384 # default 4096 (and must be 2048 at least!)
     #   - NXCT_SERVICE_EMAIL=your@email.tld
     #   - NXCT_SERVICE_DHPARAM=2048 # default 2048 (and must be 2048 at least!)
@@ -47,6 +48,7 @@ services:
     #   - NXCT_SERVICE_DELTEOUTDATEDCERTS=true # default false
     #   - NXCT_SERVICE_ALLOWUNKNOWNDOMAINS=false
     #   - NXCT_SERVICE_CERTDIRPERMS=600 # default 777 (use 600 or similar in production)
+    #   # Host configuration
     #   - NXCT_SERVICE_HOST_1=min.template.public-domain.tld
     #   - NXCT_SERVICE_PROXY_1=frontend:80
     #   - NXCT_SERVICE_HOST_2=api.template.public-domain.tld
@@ -55,5 +57,12 @@ services:
     #   - NXCT_SERVICE_HOST_3=onemore.api.template.public-domain.tld
     #   - NXCT_SERVICE_FRONTEND_TARGET_3=frontend:80
     #   - NXCT_SERVICE_BACKEND_TARGET_3=backend:80
+    #   # Alerting - send notifications to Discord and/or MS Teams when an upstream is unavailable.
+    #   # At least one webhook URL must be set to enable alerting; all other vars are optional.
+    #   # - NXCT_ALERT_DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
+    #   # - NXCT_ALERT_MSTEAMS_WEBHOOK=https://outlook.office.com/webhook/...
+    #   - NXCT_ALERT_THRESHOLD=60 # seconds an upstream must be down before alerting
+    #   - NXCT_ALERT_INTERVAL=30 # check interval in seconds
+    #   - NXCT_ALERT_COOLDOWN=600 # seconds between repeated alerts for the same upstream
     # extra_hosts:
     #   - "host.docker.internal:host-gateway" # required on Linux!
