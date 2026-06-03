@@ -35,3 +35,9 @@ jobs:
           push: true
           tags: ${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:latest,${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:${{ env.REF_SLUG }}
         if: startsWith(github.ref, 'refs/tags/v')
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+        if: startsWith(github.ref, 'refs/tags/v')
