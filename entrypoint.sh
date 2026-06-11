@@ -436,24 +436,28 @@ do
   if [[ -e /certs/${!host}/le-ok && "$certSubject" = "$certIssuer" ]]; then
     rm /certs/${!host}/le-ok
   fi
+  # Determine ecc flag based on key length
+  ecc=""
+  keyLengthTest=`echo "$keyLength" | /usr/bin/cut -c1-2`
+  if [ "$keyLengthTest" = "ec" ]; then
+    ecc="--ecc"
+  fi
   # Replace the existing self-signed certificate with a LE one
   if [ ! -e /certs/${!host}/le-ok ]; then
-    ecc=""
-    keyLengthTest=`echo "$keyLength" | /usr/bin/cut -c1-2`
-    if [ "$keyLengthTest" = "ec" ]; then
-      ecc="--ecc"
-    fi
     echo ""
     echo "Requesting a certificate from Let's Encrypt certificate for ${!host}..."
     /root/.acme.sh/acme.sh $test --log --issue -w /var/www/html/ -d ${!host} -k $keyLength
-    /root/.acme.sh/acme.sh $test --log --installcert $ecc -d ${!host} \
-                           --key-file /certs/${!host}/key.pem \
-                           --fullchain-file /certs/${!host}/fullchain.pem \
-			   --cert-file /certs/${!host}/cert.pem \
-                           --reloadcmd '/usr/sbin/nginx -s reload'
     touch /certs/${!host}/le-ok
     echo "Let's Encrypt certificate for ${!host} installed."
     echo ""
+  fi
+  # Always register cert paths and reloadcmd with acme.sh so renewal works after container rebuilds
+  if [ -e /certs/${!host}/le-ok ]; then
+    /root/.acme.sh/acme.sh $test --log --installcert $ecc -d ${!host} \
+                           --key-file /certs/${!host}/key.pem \
+                           --fullchain-file /certs/${!host}/fullchain.pem \
+                           --cert-file /certs/${!host}/cert.pem \
+                           --reloadcmd '/usr/sbin/nginx -s reload'
   fi
 done
 
