@@ -451,8 +451,24 @@ do
     echo "Let's Encrypt certificate for ${!host} installed."
     echo ""
   fi
-  # Always register cert paths and reloadcmd with acme.sh so renewal works after container rebuilds
+  # Always register cert paths and reloadcmd with acme.sh so renewal works after container rebuilds.
+  # --installcert requires acme.sh's internal domain dir to exist, so reconstruct it from the
+  # existing cert files in /certs/<host>/ if it was wiped by a container rebuild.
   if [ -e /certs/${!host}/le-ok ]; then
+    acmeSuffix=""
+    if [ "$ecc" = "--ecc" ]; then
+      acmeSuffix="_ecc"
+    fi
+    acmeDomainDir="/root/.acme.sh/${!host}${acmeSuffix}"
+    if [ ! -d "$acmeDomainDir" ]; then
+      echo "Restoring acme.sh domain dir for ${!host} from existing cert files..."
+      mkdir -p "$acmeDomainDir"
+      cp /certs/${!host}/cert.pem "$acmeDomainDir/${!host}.cer"
+      cp /certs/${!host}/key.pem "$acmeDomainDir/${!host}.key"
+      cp /certs/${!host}/fullchain.pem "$acmeDomainDir/fullchain.cer"
+      awk 'p; /-----END CERTIFICATE-----/{p=1}' /certs/${!host}/fullchain.pem > "$acmeDomainDir/ca.cer"
+      printf "Le_Domain='%s'\nLe_Alt='no'\nLe_Webroot='/var/www/html/'\nLe_Keylength='%s'\nLe_API='https://acme-v02.api.letsencrypt.org/directory'\n" "${!host}" "$keyLength" > "$acmeDomainDir/${!host}.conf"
+    fi
     /root/.acme.sh/acme.sh $test --log --installcert $ecc -d ${!host} \
                            --key-file /certs/${!host}/key.pem \
                            --fullchain-file /certs/${!host}/fullchain.pem \
