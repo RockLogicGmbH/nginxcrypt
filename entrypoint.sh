@@ -436,24 +436,59 @@ do
   if [[ -e /certs/${!host}/le-ok && "$certSubject" = "$certIssuer" ]]; then
     rm /certs/${!host}/le-ok
   fi
+  # Determine ecc flag based on key length
+  ecc=""
+  keyLengthTest=`echo "$keyLength" | /usr/bin/cut -c1-2`
+  if [ "$keyLengthTest" = "ec" ]; then
+    ecc="--ecc"
+  fi
   # Replace the existing self-signed certificate with a LE one
   if [ ! -e /certs/${!host}/le-ok ]; then
-    ecc=""
-    keyLengthTest=`echo "$keyLength" | /usr/bin/cut -c1-2`
-    if [ "$keyLengthTest" = "ec" ]; then
-      ecc="--ecc"
-    fi
     echo ""
     echo "Requesting a certificate from Let's Encrypt certificate for ${!host}..."
     /root/.acme.sh/acme.sh $test --log --issue -w /var/www/html/ -d ${!host} -k $keyLength
-    /root/.acme.sh/acme.sh $test --log --installcert $ecc -d ${!host} \
-                           --key-file /certs/${!host}/key.pem \
-                           --fullchain-file /certs/${!host}/fullchain.pem \
-			   --cert-file /certs/${!host}/cert.pem \
-                           --reloadcmd '/usr/sbin/nginx -s reload'
     touch /certs/${!host}/le-ok
     echo "Let's Encrypt certificate for ${!host} installed."
     echo ""
+  fi
+  # Always register cert paths and reloadcmd with acme.sh so renewal works after container rebuilds.
+  # acme.sh's internal domain dir lives inside the container (not a volume) and is lost on rebuild.
+  # We persist just the domain conf to /certs/<host>/.acme.conf (in the volume) and restore it on
+  # startup so acme.sh has all required fields (including Le_CertCreateTime) for --cron to work.
+  if [ -e /certs/${!host}/le-ok ]; then
+    acmeSuffix=""
+    if [ "$ecc" = "--ecc" ]; then
+      acmeSuffix="_ecc"
+    fi
+    acmeDomainDir="/root/.acme.sh/${!host}${acmeSuffix}"
+    acmeConfBackup="/certs/${!host}/.acme.conf"
+    if [ ! -d "$acmeDomainDir" ]; then
+      echo "Restoring acme.sh domain dir for ${!host}..."
+      mkdir -p "$acmeDomainDir"
+      cp /certs/${!host}/cert.pem "$acmeDomainDir/${!host}.cer"
+      cp /certs/${!host}/key.pem "$acmeDomainDir/${!host}.key"
+      cp /certs/${!host}/fullchain.pem "$acmeDomainDir/fullchain.cer"
+      awk 'p; /-----END CERTIFICATE-----/{p=1}' /certs/${!host}/fullchain.pem > "$acmeDomainDir/ca.cer"
+      if [ -f "$acmeConfBackup" ]; then
+        cp "$acmeConfBackup" "$acmeDomainDir/${!host}.conf"
+      else
+        # No backup yet - derive Le_CertCreateTime from the cert so acme.sh --cron does not skip
+        certCreateTime=$(openssl x509 -in /certs/${!host}/cert.pem -noout -startdate 2>/dev/null | cut -d= -f2 | awk \
+          'BEGIN{m["Jan"]=1;m["Feb"]=2;m["Mar"]=3;m["Apr"]=4;m["May"]=5;m["Jun"]=6;m["Jul"]=7;m["Aug"]=8;m["Sep"]=9;m["Oct"]=10;m["Nov"]=11;m["Dec"]=12}
+           {mo=m[$1];d=$2;split($3,t,":");y=$4;if(mo<=2){y--;mo+=12};a=int(y/100);b=2-a+int(a/4);jd=int(365.25*(y+4716))+int(30.6001*(mo+1))+d+b-1524;print (jd-2440588)*86400+t[1]*3600+t[2]*60+t[3]}')
+        [ -z "$certCreateTime" ] && certCreateTime=0
+        certNextRenew=$((certCreateTime + 5184000))
+        printf "Le_Domain='%s'\nLe_Alt='no'\nLe_Webroot='/var/www/html/'\nLe_Keylength='%s'\nLe_API='https://acme-v02.api.letsencrypt.org/directory'\nLe_CertCreateTime='%s'\nLe_NextRenewTime='%s'\n" \
+          "${!host}" "$keyLength" "$certCreateTime" "$certNextRenew" > "$acmeDomainDir/${!host}.conf"
+      fi
+    fi
+    /root/.acme.sh/acme.sh $test --log --installcert $ecc -d ${!host} \
+                           --key-file /certs/${!host}/key.pem \
+                           --fullchain-file /certs/${!host}/fullchain.pem \
+                           --cert-file /certs/${!host}/cert.pem \
+                           --reloadcmd '/usr/sbin/nginx -s reload'
+    # Persist the conf to the volume so it survives future rebuilds
+    cp "$acmeDomainDir/${!host}.conf" "$acmeConfBackup"
   fi
 done
 
