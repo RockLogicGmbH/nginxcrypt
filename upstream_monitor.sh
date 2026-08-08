@@ -116,11 +116,13 @@ while true; do
 
     if check_upstream "$upstream"; then
       if [ -f "$down_file" ]; then
+        if [ -f "$last_alert_file" ]; then
+          log "[upstream-monitor] RECOVERED: $upstream (serving: $domains)"
+          send_alert "Upstream recovered" \
+            "Upstream $upstream serving $domains on host $HOST_IP is back online." \
+            "00B050"
+        fi
         rm -f "$down_file" "$last_alert_file"
-        log "[upstream-monitor] RECOVERED: $upstream (serving: $domains)"
-        send_alert "Upstream recovered" \
-          "Upstream $upstream serving $domains on host $HOST_IP is back online." \
-          "00B050"
       fi
     else
       now=$(date +%s)
