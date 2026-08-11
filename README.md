@@ -174,19 +174,16 @@ With `NXCT_ALERT_PROBE_DOMAINS` every configured domain is additionally probed t
    - Choose the channel to post in
 6. Click "Copy Webhook URL".
    It will look like:
-   https://discord.com/api/webhooks/123456789012345678/abcdefGHIJKLMNOPQrstuv123456
+   `https://discord.com/api/webhooks/123456789012345678/abcdefGHIJKLMNOPQrstuv123456`
 
-**MS Teams** - how to get a `MESSENGER_MSTEAMS_WEBHOOK_URL` from your MSTEAMS server:
+**MS Teams** - how to get a `NXCT_ALERT_MSTEAMS_WEBHOOK` from your Teams channel:
 
-1. Open your MSTEAMS server
-2. Go to the channel where you want the alerts.
-3. Click "... (More options)" -> "Connectors".
-4. Find and click "Incoming Webhook", then:
-   - Give it a name (e.g. "🚨 NginxCrypt Alert Bot 🚨")
-   - Optionally upload an icon
-   - Click "Create"
-5. Copy the webhook URL - it looks like:
-   https://outlook.office.com/webhook/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX@YYYYYYYYY...
+1. Open Microsoft Teams and go to the channel where you want the alerts
+2. Click "... (More options)" -> "Workflows"
+3. Search for "webhook" and select the **"Send webhook alerts to a channel"** template
+4. Confirm the team/channel and finish the setup (name it whatever you like)
+5. Copy the webhook URL it gives you - it looks like:
+   `https://default*.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/.../workflows/.../triggers/manual/paths/invoke?api-version=1&...`
 
 ### Config file
 
@@ -219,7 +216,7 @@ Example `.env.example` (see [.env.example](./.env.example)):
 # Alerting - send notifications to Discord and/or MS Teams when an upstream is unavailable.
 # At least one webhook URL must be set to enable notifications; all other vars are optional.
 # NXCT_ALERT_DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
-# NXCT_ALERT_MSTEAMS_WEBHOOK=https://outlook.office.com/webhook/...
+# NXCT_ALERT_MSTEAMS_WEBHOOK=https://default*.environment.api.powerplatform.com:443/powerautomate/...
 # NXCT_ALERT_THRESHOLD=60
 # NXCT_ALERT_INTERVAL=30
 # NXCT_ALERT_COOLDOWN=600
@@ -344,7 +341,7 @@ services:
     #   # Alerting - send notifications to Discord and/or MS Teams when an upstream is unavailable.
     #   # At least one webhook URL must be set to enable notifications; all other vars are optional.
     #   # - NXCT_ALERT_DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
-    #   # - NXCT_ALERT_MSTEAMS_WEBHOOK=https://outlook.office.com/webhook/...
+    #   # - NXCT_ALERT_MSTEAMS_WEBHOOK=https://default*.environment.api.powerplatform.com:443/powerautomate/...
     #   - NXCT_ALERT_THRESHOLD=60 # seconds an upstream must be down before alerting
     #   - NXCT_ALERT_INTERVAL=30 # check interval in seconds
     #   - NXCT_ALERT_COOLDOWN=600 # seconds between repeated alerts for the same upstream

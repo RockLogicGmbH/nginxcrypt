@@ -79,9 +79,15 @@ send_msteams() {
   local title="$1"
   local message="$2"
   local color="$3"
-  local payload
-  payload=$(printf '{"@type":"MessageCard","@context":"https://schema.org/extensions","themeColor":"%s","title":"%s","text":"%s"}' \
-    "$color" "$title" "$message")
+  local icon payload
+  case "$color" in
+    EA4300) icon="🔴" ;;
+    00B050) icon="🟢" ;;
+    FFC000) icon="🟡" ;;
+    *)      icon="" ;;
+  esac
+  payload=$(printf '{"@type":"MessageCard","@context":"https://schema.org/extensions","themeColor":"%s","title":"NginxCrypt Notification Bot","sections":[{"activityTitle":"%s **%s**"},{"text":"%s"}]}' \
+    "$color" "$icon" "$title" "$message")
   curl -s -o /dev/null -X POST "$MSTEAMS_WEBHOOK" \
     -H "Content-Type: application/json" \
     -d "$payload" \
