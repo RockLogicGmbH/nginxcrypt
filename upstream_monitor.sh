@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Checks all configured NXCT_SERVICE_* upstreams at a regular interval and sends
-# alerts to Discord and/or MS Teams when an upstream has been unreachable for too long.
+# Checks all configured NXCT_SERVICE_* upstreams (and, optionally, domains) at a regular
+# interval and sends alerts to Discord and/or MS Teams when one has been unreachable for too long.
 # Also reloads Nginx when a backend's DNS answer changes, because Nginx only resolves
 # proxy_pass hostnames at start/reload and would keep proxying to a dead or recycled IP.
 # Alerts are opt-in via NXCT_ALERT_*, the reload runs either way.

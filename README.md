@@ -130,7 +130,7 @@ NginxCrypt monitors all configured upstreams in the background and can send noti
 Alert messages include the upstream address, the domain(s) it serves, and the public IP of the host - for example:
 
 ```
-Upstream frontend:80 serving rocklogic.at, example.com on host 1.2.3.4 has been unreachable for 90s.
+Upstream frontend:80 serving rocklogic.at, example.com on host 1.2.3.4 has been unreachable for 90s (last HTTP status: 000).
 ```
 
 A recovery notification is sent automatically when the upstream comes back online. Alert state is stored in `/certs/.nxct_monitor/` (the persistent certs volume), so recovery notifications are sent correctly even after a container restart.
@@ -163,7 +163,7 @@ The monitor therefore compares each upstream's resolved IP on every pass and rel
 [upstream-monitor] DNS CHANGE: frontend:80 (serving: example.com) 172.19.0.2 -> 172.19.0.7
 ```
 
-This repairs the proxy itself and therefore runs even with no webhook configured - only the notifications are opt-in. `nginx -t` is checked first: if the generated configuration does not parse the reload is skipped and retried on the next pass instead of being forced. Set `NXCT_ALERT_RELOAD_ON_DNS_CHANGE=false` to keep the detection but skip the reload.
+This repairs the proxy itself and therefore runs even with no alerting webhook configured - only the notifications require one. `nginx -t` is checked first: if the generated configuration does not parse the reload is skipped and retried on the next pass instead of being forced. Set `NXCT_ALERT_RELOAD_ON_DNS_CHANGE=false` to keep the detection but skip the reload.
 
 **Discord** - how to get a `MESSENGER_DISCORD_WEBHOOK_URL` from your Discord server:
 
@@ -223,10 +223,10 @@ Example `.env.example` (see [.env.example](./.env.example)):
 # NXCT_ALERT_INTERVAL=30
 # NXCT_ALERT_COOLDOWN=600
 # NXCT_ALERT_LOG_TIMESTAMP_FORMAT="%Y/%m/%d %H:%M:%S [notice] 1#1:"
-# Also probe every configured domain over HTTPS through this NginxCrypt instance
+# Also probe every configured domain over HTTPS through this NginxCrypt instance.
 # NXCT_ALERT_PROBE_DOMAINS=true
 # Reload Nginx service when a backend's DNS answer changes so proxy_pass targets are re-resolved.
-# This self-healing runs even without a webhook configured - only notifications are opt-in.
+# This self-healing runs even without an alerting webhook configured - only notifications require one.
 # NXCT_ALERT_RELOAD_ON_DNS_CHANGE=true
 ```
 
