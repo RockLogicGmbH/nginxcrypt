@@ -57,14 +57,14 @@ services:
     #   - NXCT_SERVICE_HOST_3=onemore.api.template.public-domain.tld
     #   - NXCT_SERVICE_FRONTEND_TARGET_3=frontend:80
     #   - NXCT_SERVICE_BACKEND_TARGET_3=backend:80
-    #   # Alerting - send notifications to Discord and/or MS Teams when an upstream is unavailable.
+    #   # Alerting - send notifications to Discord and/or MS Teams when an upstream or domain is unavailable.
     #   # At least one webhook URL must be set to enable notifications; all other vars are optional.
     #   # - NXCT_ALERT_DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
     #   # - NXCT_ALERT_MSTEAMS_WEBHOOK=https://default*.environment.api.powerplatform.com:443/powerautomate/...
-    #   - NXCT_ALERT_THRESHOLD=60 # seconds an upstream must be down before alerting
+    #   - NXCT_ALERT_THRESHOLD=60 # seconds an upstream or domain must be down before alerting
     #   - NXCT_ALERT_INTERVAL=30 # check interval in seconds
-    #   - NXCT_ALERT_COOLDOWN=600 # seconds between repeated alerts for the same upstream
-    #   - NXCT_ALERT_RELOAD_ON_DNS_CHANGE=true # reload Nginx when a backend's DNS answer changes (self-healing, runs without webhooks too)
-    #   - NXCT_ALERT_PROBE_DOMAINS=true # also probe every configured domain over HTTPS through this Nginx instance
+    #   - NXCT_ALERT_COOLDOWN=600 # seconds between repeated alerts for the same upstream or domain
+    #   - NXCT_ALERT_PROBE_DOMAINS=true # also probe every configured domain over HTTPS through this NginxCrypt instance
+    #   - NXCT_ALERT_RELOAD_ON_DNS_CHANGE=true # reload Nginx service when a backend's DNS answer changes (self-healing, runs without webhooks too)
     extra_hosts:
       - "host.docker.internal:host-gateway" # required on Linux!
