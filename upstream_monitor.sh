@@ -258,9 +258,12 @@ check_dns_drift() {
   [ "$FIRST_ITERATION" = true ] && return 0
 
   if [ -n "$previous" ] && [ "$current" != "$previous" ]; then
+    local reload_note="reloading Nginx to re-resolve it"
+    [ "$RELOAD_ON_DNS_CHANGE" = true ] || reload_note="reload is disabled - staying pinned to the old IP"
+
     log "[upstream-monitor] DNS CHANGE: $upstream (serving: $domains) $previous -> $current"
     send_alert "Upstream IP changed" \
-      "Upstream $upstream serving $domains on host $HOST_IP changed IP from $previous to $current, reloading Nginx to re-resolve it." \
+      "Upstream $upstream serving $domains on host $HOST_IP changed IP from $previous to $current, $reload_note." \
       "FFC000"
 
     if [ "$RELOAD_ON_DNS_CHANGE" != true ]; then
