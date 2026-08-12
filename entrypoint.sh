@@ -397,6 +397,15 @@ do
       proxy="DEFAULT_NXCT_SERVICE_FRONTEND_TARGET"
       echo "set empty proxy to DEFAULT_NXCT_SERVICE_FRONTEND_TARGET"
   fi
+
+  # Export the resolved values back onto this service's real NXCT_SERVICE_*
+  # vars - otherwise a service relying on these defaults is invisible to
+  # upstream_monitor.sh (started later), which only ever reads those vars
+  # directly and has no knowledge of the fallback resolution above.
+  [ -n "${!proxy}" ] && export "NXCT_SERVICE_PROXY_$service=${!proxy}"
+  [ -n "${!feproxy}" ] && export "NXCT_SERVICE_FRONTEND_TARGET_$service=${!feproxy}"
+  [ -n "${!beproxy}" ] && export "NXCT_SERVICE_BACKEND_TARGET_$service=${!beproxy}"
+
   echo "Generating Nginx configuration for \"${!host}\"."
   FILE_NAME=$(echo $service | tr '[:upper:]' '[:lower:]').conf
   if ! [ -z "${!proxy}" ]; then
