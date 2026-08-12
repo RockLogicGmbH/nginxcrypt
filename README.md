@@ -114,23 +114,23 @@ Under the hood there is also one more key `NXCT_SERVICE_SUBJ_`: The self-signed 
 
 #### Alerting
 
-NginxCrypt monitors all configured upstreams in the background and can send notifications to Discord and/or MS Teams when an upstream becomes unavailable. Alerting is opt-in - no notification is ever sent unless at least one webhook URL is set.
+NginxCrypt monitors all configured upstreams in the background and can send notifications to Discord and/or MS Teams when an upstream or domain becomes unavailable. Alerting is opt-in - no notification is ever sent unless at least one webhook URL is set.
 
 | Name                            | Default | Required | Description                                                                 |
 | ------------------------------- | ------- | -------- | --------------------------------------------------------------------------- |
 | NXCT_ALERT_DISCORD_WEBHOOK      | ""      | No       | Discord incoming webhook URL                                                |
 | NXCT_ALERT_MSTEAMS_WEBHOOK      | ""      | No       | MS Teams incoming webhook URL                                               |
-| NXCT_ALERT_THRESHOLD            | 60      | No       | Seconds an upstream must be unreachable before alerting                     |
-| NXCT_ALERT_INTERVAL             | 30      | No       | How often (in seconds) upstreams are checked                                |
-| NXCT_ALERT_COOLDOWN             | 600     | No       | Seconds between repeated alerts for the same upstream                       |
+| NXCT_ALERT_THRESHOLD            | 60      | No       | Seconds an upstream or domain must be unreachable before alerting           |
+| NXCT_ALERT_INTERVAL             | 30      | No       | How often (in seconds) upstreams and domains are checked                    |
+| NXCT_ALERT_COOLDOWN             | 600     | No       | Seconds between repeated alerts for the same upstream or domain             |
 | NXCT_ALERT_LOG_TIMESTAMP_FORMAT | ""      | No       | strftime format string prepended to container alerting-log lines (optional) |
-| NXCT_ALERT_RELOAD_ON_DNS_CHANGE | true    | No       | Reload Nginx when a backend's DNS answer changes                            |
-| NXCT_ALERT_PROBE_DOMAINS        | true    | No       | Additionally probe every configured domain through this Nginx instance      |
+| NXCT_ALERT_PROBE_DOMAINS        | true    | No       | Additionally probe every configured domain through this NginxCrypt instance |
+| NXCT_ALERT_RELOAD_ON_DNS_CHANGE | true    | No       | Reload Nginx service when a backend's DNS answer changes                    |
 
 Alert messages include the upstream address, the domain(s) it serves, and the public IP of the host - for example:
 
 ```
-Upstream frontend:80 serving rocklogic.at, example.com on host 1.2.3.4 has been unreachable for 90s.
+Upstream frontend:80 serving rocklogic.at, example.com on host 1.2.3.4 has been unreachable for 90s (last HTTP status: 000).
 ```
 
 A recovery notification is sent automatically when the upstream comes back online. Alert state is stored in `/certs/.nxct_monitor/` (the persistent certs volume), so recovery notifications are sent correctly even after a container restart.
@@ -149,6 +149,12 @@ This produces output like:
 2026/05/22 08:46:00 [notice] 1#1: [upstream-monitor] UNREACHABLE: frontend:80 (serving: example.com) returned HTTP 000 - down for 60s
 ```
 
+##### Domain probing
+
+The plain upstream check only verifies the raw backend address is reachable - it never touches Nginx's own routing, TLS, or configuration. With `NXCT_ALERT_PROBE_DOMAINS` (default `true`) every configured domain is additionally probed through this NginxCrypt instance itself (`/` for proxy and frontend targets, `/api` for backend targets), catching failures that only show up on the real request path - a broken cert, a config error, or Nginx itself being down while the backend is perfectly healthy. A `403`/`406` is reported as a proxy misconfiguration (undefined domain or `Host`/`server_name` mismatch) rather than an upstream outage.
+
+Each pass runs the upstream check plus one probe per configured domain/path sequentially, before sleeping for `NXCT_ALERT_INTERVAL` - so `NXCT_ALERT_INTERVAL` is a floor on the check cadence, not a fixed one. With several domains/paths configured, a pass where multiple probes are genuinely failing can take noticeably longer than `NXCT_ALERT_INTERVAL` to complete, which pushes actual alert timing somewhat past `NXCT_ALERT_THRESHOLD` during a real outage.
+
 ##### DNS drift detection
 
 Nginx resolves every `proxy_pass` hostname once at startup and then keeps that IP for the lifetime of the process. A redeployed app container gets a new IP while Nginx keeps talking to the old one - and if Docker recycled that IP for another container the outage looks perfectly healthy from the outside: something is listening and answers, just the wrong thing.
@@ -159,9 +165,7 @@ The monitor therefore compares each upstream's resolved IP on every pass and rel
 [upstream-monitor] DNS CHANGE: frontend:80 (serving: example.com) 172.19.0.2 -> 172.19.0.7
 ```
 
-This repairs the proxy itself and therefore runs even with no webhook configured - only the notifications are opt-in. `nginx -t` is checked first: if the generated configuration does not parse the reload is skipped and retried on the next pass instead of being forced. Set `NXCT_ALERT_RELOAD_ON_DNS_CHANGE=false` to keep the detection but skip the reload.
-
-With `NXCT_ALERT_PROBE_DOMAINS` every configured domain is additionally probed through this Nginx instance (`/` for proxy and frontend targets, `/api` for backend targets). A `403`/`406` is reported as a proxy misconfiguration (undefined domain or `Host`/`server_name` mismatch) rather than an upstream outage.
+This repairs the proxy itself and therefore runs even with no alerting webhook configured - only the notifications require one. `nginx -t` is checked first: if the generated configuration does not parse the reload is skipped and retried on the next pass instead of being forced. Set `NXCT_ALERT_RELOAD_ON_DNS_CHANGE=false` to keep the detection but skip the reload.
 
 **Discord** - how to get a `MESSENGER_DISCORD_WEBHOOK_URL` from your Discord server:
 
@@ -174,19 +178,16 @@ With `NXCT_ALERT_PROBE_DOMAINS` every configured domain is additionally probed t
    - Choose the channel to post in
 6. Click "Copy Webhook URL".
    It will look like:
-   https://discord.com/api/webhooks/123456789012345678/abcdefGHIJKLMNOPQrstuv123456
+   `https://discord.com/api/webhooks/123456789012345678/abcdefGHIJKLMNOPQrstuv123456`
 
-**MS Teams** - how to get a `MESSENGER_MSTEAMS_WEBHOOK_URL` from your MSTEAMS server:
+**MS Teams** - how to get a `NXCT_ALERT_MSTEAMS_WEBHOOK` from your Teams channel:
 
-1. Open your MSTEAMS server
-2. Go to the channel where you want the alerts.
-3. Click "... (More options)" -> "Connectors".
-4. Find and click "Incoming Webhook", then:
-   - Give it a name (e.g. "🚨 NginxCrypt Alert Bot 🚨")
-   - Optionally upload an icon
-   - Click "Create"
-5. Copy the webhook URL - it looks like:
-   https://outlook.office.com/webhook/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX@YYYYYYYYY...
+1. Open Microsoft Teams and go to the channel where you want the alerts
+2. Click "... (More options)" -> "Workflows"
+3. Search for "webhook" and select the **"Send webhook alerts to a channel"** template
+4. Confirm the team/channel and finish the setup (name it whatever you like)
+5. Copy the webhook URL it gives you - it looks like:
+   `https://default*.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/.../workflows/.../triggers/manual/paths/invoke?api-version=1&...`
 
 ### Config file
 
@@ -216,19 +217,19 @@ Example `.env.example` (see [.env.example](./.env.example)):
 # NXCT_SERVICE_FRONTEND_TARGET_3=frontend:80
 # NXCT_SERVICE_BACKEND_TARGET_3=backend:80
 
-# Alerting - send notifications to Discord and/or MS Teams when an upstream is unavailable.
+# Alerting - send notifications to Discord and/or MS Teams when an upstream or domain is unavailable.
 # At least one webhook URL must be set to enable notifications; all other vars are optional.
 # NXCT_ALERT_DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
-# NXCT_ALERT_MSTEAMS_WEBHOOK=https://outlook.office.com/webhook/...
+# NXCT_ALERT_MSTEAMS_WEBHOOK=https://default*.environment.api.powerplatform.com:443/powerautomate/...
 # NXCT_ALERT_THRESHOLD=60
 # NXCT_ALERT_INTERVAL=30
 # NXCT_ALERT_COOLDOWN=600
 # NXCT_ALERT_LOG_TIMESTAMP_FORMAT="%Y/%m/%d %H:%M:%S [notice] 1#1:"
-# Reload Nginx when a backend's DNS answer changes so proxy_pass targets are re-resolved.
-# This self-healing runs even without a webhook configured - only notifications are opt-in.
-# NXCT_ALERT_RELOAD_ON_DNS_CHANGE=true
-# Also probe every configured domain over HTTPS through this Nginx instance
+# Also probe every configured domain over HTTPS through this NginxCrypt instance.
 # NXCT_ALERT_PROBE_DOMAINS=true
+# Reload Nginx service when a backend's DNS answer changes so proxy_pass targets are re-resolved.
+# This self-healing runs even without an alerting webhook configured - only notifications require one.
+# NXCT_ALERT_RELOAD_ON_DNS_CHANGE=true
 ```
 
 The config file is read from the `.env` file specified in the `docker-compose.yaml` for the `proxy` container which is by default the .env file in your NginxCrypt application root.
@@ -304,6 +305,16 @@ Stop:
 sudo docker compose down
 ```
 
+### E2E testing
+
+[tests/e2e_alerting.sh](./tests/e2e_alerting.sh) is an end-to-end test for `upstream_monitor.sh`'s alerting and DNS-drift self-healing. It brings up a clean copy of the stack itself (rebuilding the `proxy` image first), runs through an outage/recovery cycle and a simulated DNS drift, then tears the stack down again afterward - on normal completion, on error, or on Ctrl+C.
+
+```
+bash tests/e2e_alerting.sh
+```
+
+See [tests/e2e_alerting.md](./tests/e2e_alerting.md) for prerequisites, exactly what each step checks, and usage notes.
+
 ## Example
 
 Here is an example with three domains using different templates:
@@ -341,16 +352,16 @@ services:
     #   - NXCT_SERVICE_HOST_3=onemore.api.template.public-domain.tld
     #   - NXCT_SERVICE_FRONTEND_TARGET_3=frontend:80
     #   - NXCT_SERVICE_BACKEND_TARGET_3=backend:80
-    #   # Alerting - send notifications to Discord and/or MS Teams when an upstream is unavailable.
+    #   # Alerting - send notifications to Discord and/or MS Teams when an upstream or domain is unavailable.
     #   # At least one webhook URL must be set to enable notifications; all other vars are optional.
     #   # - NXCT_ALERT_DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
-    #   # - NXCT_ALERT_MSTEAMS_WEBHOOK=https://outlook.office.com/webhook/...
-    #   - NXCT_ALERT_THRESHOLD=60 # seconds an upstream must be down before alerting
+    #   # - NXCT_ALERT_MSTEAMS_WEBHOOK=https://default*.environment.api.powerplatform.com:443/powerautomate/...
+    #   - NXCT_ALERT_THRESHOLD=60 # seconds an upstream or domain must be down before alerting
     #   - NXCT_ALERT_INTERVAL=30 # check interval in seconds
-    #   - NXCT_ALERT_COOLDOWN=600 # seconds between repeated alerts for the same upstream
+    #   - NXCT_ALERT_COOLDOWN=600 # seconds between repeated alerts for the same upstream or domain
     #   - NXCT_ALERT_LOG_TIMESTAMP_FORMAT="%Y/%m/%d %H:%M:%S [notice] 1#1:" # strftime format string prepended to container alerting-log lines (optional)
-    #   - NXCT_ALERT_RELOAD_ON_DNS_CHANGE=true # reload Nginx when a backend's DNS answer changes (self-healing, runs without webhooks too)
-    #   - NXCT_ALERT_PROBE_DOMAINS=true # also probe every configured domain over HTTPS through this Nginx instance
+    #   - NXCT_ALERT_PROBE_DOMAINS=true # also probe every configured domain over HTTPS through this NginxCrypt instance
+    #   - NXCT_ALERT_RELOAD_ON_DNS_CHANGE=true # reload Nginx service when a backend's DNS answer changes (self-healing, runs without webhooks too)
     extra_hosts:
       - "host.docker.internal:host-gateway" # required on Linux!
 ```

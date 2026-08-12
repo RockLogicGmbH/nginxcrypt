@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Checks all configured NXCT_SERVICE_* upstreams at a regular interval and sends
-# alerts to Discord and/or MS Teams when an upstream has been unreachable for too long.
+# Checks all configured NXCT_SERVICE_* upstreams (and, optionally, domains) at a regular
+# interval and sends alerts to Discord and/or MS Teams when one has been unreachable for too long.
 # Also reloads Nginx when a backend's DNS answer changes, because Nginx only resolves
 # proxy_pass hostnames at start/reload and would keep proxying to a dead or recycled IP.
 # Alerts are opt-in via NXCT_ALERT_*, the reload runs either way.
@@ -38,6 +38,14 @@ normalize_bool() {
 }
 RELOAD_ON_DNS_CHANGE=$(normalize_bool "$RELOAD_ON_DNS_CHANGE")
 PROBE_DOMAINS=$(normalize_bool "$PROBE_DOMAINS")
+
+# A 0/negative/non-numeric interval would turn the main loop into an
+# unthrottled busy-loop (sleep 0 returns immediately) - clamp to a sane floor.
+MIN_INTERVAL=1
+if ! [[ "$INTERVAL" =~ ^[0-9]+$ ]] || [ "$INTERVAL" -lt "$MIN_INTERVAL" ]; then
+  log "[upstream-monitor] NXCT_ALERT_INTERVAL=\"$INTERVAL\" is invalid or below the minimum (${MIN_INTERVAL}s) - clamping to ${MIN_INTERVAL}s"
+  INTERVAL="$MIN_INTERVAL"
+fi
 
 # Without a webhook nothing is sent, but the loop still runs for the DNS reload
 ALERTS_ENABLED=true
@@ -79,9 +87,15 @@ send_msteams() {
   local title="$1"
   local message="$2"
   local color="$3"
-  local payload
-  payload=$(printf '{"@type":"MessageCard","@context":"https://schema.org/extensions","themeColor":"%s","title":"%s","text":"%s"}' \
-    "$color" "$title" "$message")
+  local icon payload
+  case "$color" in
+    EA4300) icon="🔴" ;;
+    00B050) icon="🟢" ;;
+    FFC000) icon="🟡" ;;
+    *)      icon="" ;;
+  esac
+  payload=$(printf '{"@type":"MessageCard","@context":"https://schema.org/extensions","themeColor":"%s","title":"NginxCrypt Notification Bot","sections":[{"activityTitle":"%s **%s**"},{"text":"%s"}]}' \
+    "$color" "$icon" "$title" "$message")
   curl -s -o /dev/null -X POST "$MSTEAMS_WEBHOOK" \
     -H "Content-Type: application/json" \
     -d "$payload" \
@@ -252,9 +266,12 @@ check_dns_drift() {
   [ "$FIRST_ITERATION" = true ] && return 0
 
   if [ -n "$previous" ] && [ "$current" != "$previous" ]; then
+    local reload_note="reloading Nginx to re-resolve it"
+    [ "$RELOAD_ON_DNS_CHANGE" = true ] || reload_note="reload is disabled - staying pinned to the old IP"
+
     log "[upstream-monitor] DNS CHANGE: $upstream (serving: $domains) $previous -> $current"
     send_alert "Upstream IP changed" \
-      "Upstream $upstream serving $domains on host $HOST_IP changed IP from $previous to $current, reloading Nginx to re-resolve it." \
+      "Upstream $upstream serving $domains on host $HOST_IP changed IP from $previous to $current, $reload_note." \
       "FFC000"
 
     if [ "$RELOAD_ON_DNS_CHANGE" != true ]; then
