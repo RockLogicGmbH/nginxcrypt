@@ -153,6 +153,8 @@ This produces output like:
 
 The plain upstream check only verifies the raw backend address is reachable - it never touches Nginx's own routing, TLS, or configuration. With `NXCT_ALERT_PROBE_DOMAINS` (default `true`) every configured domain is additionally probed through this NginxCrypt instance itself (`/` for proxy and frontend targets, `/api` for backend targets), catching failures that only show up on the real request path - a broken cert, a config error, or Nginx itself being down while the backend is perfectly healthy. A `403`/`406` is reported as a proxy misconfiguration (undefined domain or `Host`/`server_name` mismatch) rather than an upstream outage.
 
+Each pass runs the upstream check plus one probe per configured domain/path sequentially, before sleeping for `NXCT_ALERT_INTERVAL` - so `NXCT_ALERT_INTERVAL` is a floor on the check cadence, not a fixed one. With several domains/paths configured, a pass where multiple probes are genuinely failing can take noticeably longer than `NXCT_ALERT_INTERVAL` to complete, which pushes actual alert timing somewhat past `NXCT_ALERT_THRESHOLD` during a real outage.
+
 ##### DNS drift detection
 
 Nginx resolves every `proxy_pass` hostname once at startup and then keeps that IP for the lifetime of the process. A redeployed app container gets a new IP while Nginx keeps talking to the old one - and if Docker recycled that IP for another container the outage looks perfectly healthy from the outside: something is listening and answers, just the wrong thing.
@@ -302,6 +304,16 @@ Stop:
 ```
 sudo docker compose down
 ```
+
+### E2E testing
+
+[tests/e2e_alerting.sh](./tests/e2e_alerting.sh) is an end-to-end test for `upstream_monitor.sh`'s alerting and DNS-drift self-healing. It brings up a clean copy of the stack itself (rebuilding the `proxy` image first), runs through an outage/recovery cycle and a simulated DNS drift, then tears the stack down again afterward - on normal completion, on error, or on Ctrl+C.
+
+```
+bash tests/e2e_alerting.sh
+```
+
+See [tests/e2e_alerting.md](./tests/e2e_alerting.md) for prerequisites, exactly what each step checks, and usage notes.
 
 ## Example
 
