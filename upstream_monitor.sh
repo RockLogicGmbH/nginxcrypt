@@ -39,6 +39,14 @@ normalize_bool() {
 RELOAD_ON_DNS_CHANGE=$(normalize_bool "$RELOAD_ON_DNS_CHANGE")
 PROBE_DOMAINS=$(normalize_bool "$PROBE_DOMAINS")
 
+# A 0/negative/non-numeric interval would turn the main loop into an
+# unthrottled busy-loop (sleep 0 returns immediately) - clamp to a sane floor.
+MIN_INTERVAL=1
+if ! [[ "$INTERVAL" =~ ^[0-9]+$ ]] || [ "$INTERVAL" -lt "$MIN_INTERVAL" ]; then
+  log "[upstream-monitor] NXCT_ALERT_INTERVAL=\"$INTERVAL\" is invalid or below the minimum (${MIN_INTERVAL}s) - clamping to ${MIN_INTERVAL}s"
+  INTERVAL="$MIN_INTERVAL"
+fi
+
 # Without a webhook nothing is sent, but the loop still runs for the DNS reload
 ALERTS_ENABLED=true
 if [ -z "$DISCORD_WEBHOOK" ] && [ -z "$MSTEAMS_WEBHOOK" ]; then
