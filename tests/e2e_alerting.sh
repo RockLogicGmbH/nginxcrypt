@@ -16,9 +16,14 @@ if [ -n "$OTHER_PIDS" ]; then
 fi
 
 cleanup() {
+  # Capture the exit code pending BEFORE this trap ran - otherwise the exit
+  # status of the last command below (docker compose down) would silently
+  # override the real pass/fail result of the script.
+  local exit_code=$?
   echo ""
   echo "=== Cleaning up: stopping the stack ==="
   docker compose down
+  exit "$exit_code"
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
@@ -111,19 +116,56 @@ fi
 echo "Nginx is ready."
 
 # Domain probing is a separate, independently-thresholded check on top of the
-# plain upstream check - only exercise it here if it's actually enabled.
-PROBE_DOMAINS_ENABLED=$(docker exec proxy sh -c 'echo "${NXCT_ALERT_PROBE_DOMAINS:-true}"' | tr '[:upper:]' '[:lower:]')
-case "$PROBE_DOMAINS_ENABLED" in
-  false|no|0|off) PROBE_DOMAINS_ENABLED=false ;;
-  *)              PROBE_DOMAINS_ENABLED=true ;;
+# plain upstream check. NXCT_ALERT_PROBE_DOMAINS is multi-shape (see
+# upstream_monitor.sh) - mirror its exact parsing here so the test only waits
+# for domains that are actually being probed under the current setting,
+# instead of hanging forever on one that's been excluded/not allow-listed.
+PROBE_DOMAINS_RAW=$(docker exec proxy sh -c 'echo "${NXCT_ALERT_PROBE_DOMAINS:-true}"')
+PROBE_MODE="all"
+PROBE_LIST=()
+case "${PROBE_DOMAINS_RAW,,}" in
+  ""|true|yes|1|on) PROBE_MODE="all" ;;
+  false|no|0|off)   PROBE_MODE="none" ;;
+  !*)
+    PROBE_MODE="deny"
+    IFS=',' read -ra PROBE_LIST <<< "${PROBE_DOMAINS_RAW#!}"
+    ;;
+  *)
+    PROBE_MODE="allow"
+    IFS=',' read -ra PROBE_LIST <<< "$PROBE_DOMAINS_RAW"
+    ;;
 esac
+for i in "${!PROBE_LIST[@]}"; do
+  PROBE_LIST[$i]=$(echo "${PROBE_LIST[$i]}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+done
 
-if [ "$PROBE_DOMAINS_ENABLED" = true ]; then
-  DOMAINS=$(get_domains_for_container "${CONTAINER}:80")
+if [ "$PROBE_MODE" != "none" ]; then
+  ALL_DOMAINS=$(get_domains_for_container "${CONTAINER}:80")
+  DOMAINS=""
+  while IFS= read -r d; do
+    [ -z "$d" ] && continue
+    case "$PROBE_MODE" in
+      allow)
+        in_list=false
+        for x in "${PROBE_LIST[@]}"; do [ "$x" = "$d" ] && in_list=true && break; done
+        [ "$in_list" = true ] && DOMAINS+="$d"$'\n'
+        ;;
+      deny)
+        in_list=false
+        for x in "${PROBE_LIST[@]}"; do [ "$x" = "$d" ] && in_list=true && break; done
+        [ "$in_list" = false ] && DOMAINS+="$d"$'\n'
+        ;;
+      *)
+        DOMAINS+="$d"$'\n'
+        ;;
+    esac
+  done <<< "$ALL_DOMAINS"
+  DOMAINS="${DOMAINS%$'\n'}"
+
   if [ -z "$DOMAINS" ]; then
-    echo "No domains map to ${CONTAINER}:80 on \"/\" - skipping domain-level checks"
+    echo "No domains map to ${CONTAINER}:80 on \"/\" under the current NXCT_ALERT_PROBE_DOMAINS setting - skipping domain-level checks"
   else
-    echo "Domains serving ${CONTAINER}:80 on \"/\": $(echo "$DOMAINS" | tr '\n' ' ')"
+    echo "Domains serving ${CONTAINER}:80 on \"/\" being probed: $(echo "$DOMAINS" | tr '\n' ' ')"
   fi
 fi
 
@@ -217,7 +259,9 @@ if [ "$RELOAD_EXPECTED" = true ]; then
   echo "https://localhost/ -> HTTP $CODE"
   if [ "$CODE" = "200" ]; then
     echo "E2E alerting test PASSED"
-    [ "$WEBHOOK_CONFIGURED" = false ] && echo "NOTE: no NXCT_ALERT_DISCORD_WEBHOOK/NXCT_ALERT_MSTEAMS_WEBHOOK configured - detection was verified via logs only, no notification was actually sent"
+    if [ "$WEBHOOK_CONFIGURED" = false ]; then
+      echo "NOTE: no NXCT_ALERT_DISCORD_WEBHOOK/NXCT_ALERT_MSTEAMS_WEBHOOK configured - detection was verified via logs only, no notification was actually sent"
+    fi
   else
     echo "E2E alerting test FAILED (expected 200 after reload, got $CODE)"
     exit 1
@@ -229,7 +273,9 @@ else
   # stale IP and the site should NOT be healthy - that's the whole point.
   if [ "$CODE" != "200" ]; then
     echo "E2E alerting test PASSED (reload disabled - site correctly stayed pinned to the stale IP, HTTP $CODE)"
-    [ "$WEBHOOK_CONFIGURED" = false ] && echo "NOTE: no NXCT_ALERT_DISCORD_WEBHOOK/NXCT_ALERT_MSTEAMS_WEBHOOK configured - detection was verified via logs only, no notification was actually sent"
+    if [ "$WEBHOOK_CONFIGURED" = false ]; then
+      echo "NOTE: no NXCT_ALERT_DISCORD_WEBHOOK/NXCT_ALERT_MSTEAMS_WEBHOOK configured - detection was verified via logs only, no notification was actually sent"
+    fi
   else
     echo "E2E alerting test FAILED (reload is disabled but site still returned 200 - expected it to stay broken)"
     exit 1
