@@ -13,7 +13,7 @@ DISCORD_WEBHOOK="${NXCT_ALERT_DISCORD_WEBHOOK:-}"
 MSTEAMS_WEBHOOK="${NXCT_ALERT_MSTEAMS_WEBHOOK:-}"
 LOG_TIMESTAMP_FORMAT="${NXCT_ALERT_LOG_TIMESTAMP_FORMAT:-}"
 RELOAD_ON_DNS_CHANGE="${NXCT_ALERT_RELOAD_ON_DNS_CHANGE:-true}"
-PROBE_DOMAINS="${NXCT_ALERT_PROBE_DOMAINS:-true}"
+PROBE_DOMAINS_RAW="${NXCT_ALERT_PROBE_DOMAINS:-true}"
 
 # Absolute path: the cron watchdog restarts this script with a minimal PATH
 NGINX_BIN="/usr/sbin/nginx"
@@ -37,7 +37,41 @@ normalize_bool() {
   esac
 }
 RELOAD_ON_DNS_CHANGE=$(normalize_bool "$RELOAD_ON_DNS_CHANGE")
-PROBE_DOMAINS=$(normalize_bool "$PROBE_DOMAINS")
+
+trim() {
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  echo "$s"
+}
+
+# NXCT_ALERT_PROBE_DOMAINS is multi-shape:
+#   true/false (and synonyms)  - probe every configured domain, or none at all
+#   domain1.tld,domain2.tld    - probe ONLY the listed domains
+#   !domain1.tld,domain2.tld   - probe every domain EXCEPT the listed ones
+# PROBE_MODE is one of: all, none, allow, deny. PROBE_LIST holds the domain list
+# for allow/deny mode (empty otherwise).
+PROBE_MODE="all"
+PROBE_LIST=()
+case "${PROBE_DOMAINS_RAW,,}" in
+  ""|true|yes|1|on)
+    PROBE_MODE="all"
+    ;;
+  false|no|0|off)
+    PROBE_MODE="none"
+    ;;
+  !*)
+    PROBE_MODE="deny"
+    IFS=',' read -ra PROBE_LIST <<< "${PROBE_DOMAINS_RAW#!}"
+    ;;
+  *)
+    PROBE_MODE="allow"
+    IFS=',' read -ra PROBE_LIST <<< "$PROBE_DOMAINS_RAW"
+    ;;
+esac
+for i in "${!PROBE_LIST[@]}"; do
+  PROBE_LIST[$i]=$(trim "${PROBE_LIST[$i]}")
+done
 
 # A 0/negative/non-numeric interval would turn the main loop into an
 # unthrottled busy-loop (sleep 0 returns immediately) - clamp to a sane floor.
@@ -380,6 +414,19 @@ check_domain() {
     "$target (upstream $upstream) on host $HOST_IP is reachable again (HTTP $code)."
 }
 
+# Warn about typos: a listed domain that never matches a configured domain would
+# otherwise silently narrow (allow mode) or have no effect (deny mode) with no
+# visible sign anything's wrong. Configured domains don't change without a
+# container restart, so this only needs to run once, not every pass.
+if [ "$PROBE_MODE" = "allow" ] || [ "$PROBE_MODE" = "deny" ]; then
+  configured_domains=$(get_domain_map | cut -d'|' -f1 | sort -u)
+  for d in "${PROBE_LIST[@]}"; do
+    [ -z "$d" ] && continue
+    echo "$configured_domains" | grep -qxF "$d" || \
+      log "[upstream-monitor] WARNING: NXCT_ALERT_PROBE_DOMAINS lists \"$d\" but it is not a configured domain (check for typos)"
+  done
+fi
+
 while true; do
   upstream_map=$(get_upstream_map)
 
@@ -404,11 +451,25 @@ while true; do
     fi
   done <<< "$upstream_map"
 
-  if [ "$PROBE_DOMAINS" = true ]; then
+  if [ "$PROBE_MODE" != "none" ]; then
     domain_map=$(get_domain_map)
 
     while IFS='|' read -r domain path upstream; do
       [ -z "$domain" ] && continue
+
+      case "$PROBE_MODE" in
+        allow)
+          in_list=false
+          for d in "${PROBE_LIST[@]}"; do [ "$d" = "$domain" ] && in_list=true && break; done
+          [ "$in_list" = true ] || continue
+          ;;
+        deny)
+          in_list=false
+          for d in "${PROBE_LIST[@]}"; do [ "$d" = "$domain" ] && in_list=true && break; done
+          [ "$in_list" = true ] && continue
+          ;;
+      esac
+
       check_domain "$domain" "$path" "$upstream"
     done <<< "$domain_map"
   fi
