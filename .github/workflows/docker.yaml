@@ -5,8 +5,6 @@ on: push
 jobs:
   docker:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -14,14 +12,11 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Prepare Docker tag from ref
-        run: echo "REF_SLUG=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_ENV"
-
       - name: Build Docker image only
         uses: docker/build-push-action@v3
         with:
           push: false
-          tags: ${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:latest,${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:${{ env.REF_SLUG }}
+          tags: ${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:latest,${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:${{github.ref_name}}
         if: startsWith(github.ref, 'refs/tags/v') == false
 
       - name: Login to DockerHub
@@ -35,15 +30,5 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           push: true
-          tags: ${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:latest,${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:${{ env.REF_SLUG }}
-        if: startsWith(github.ref, 'refs/tags/v')
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
-        with:
-          generate_release_notes: true
-          body: |
-            | Registry | Tag | Repository |
-            |---|---|---|
-            | <picture><source media="(prefers-color-scheme: dark)" srcset="https://cdn.simpleicons.org/docker/white"><source media="(prefers-color-scheme: light)" srcset="https://cdn.simpleicons.org/docker/black"><img src="https://cdn.simpleicons.org/docker/black" width="32" alt="Docker logo"></picture> | [${{ env.REF_SLUG }}](https://hub.docker.com/r/${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt/tags?name=${{ env.REF_SLUG }}) | [${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt](https://hub.docker.com/r/${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt) |
+          tags: ${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:latest,${{ vars.DOCKERHUB_NAMESPACE }}/nginxcrypt:${{github.ref_name}}
         if: startsWith(github.ref, 'refs/tags/v')
