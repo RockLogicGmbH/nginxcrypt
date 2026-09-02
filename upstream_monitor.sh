@@ -14,6 +14,7 @@ MSTEAMS_WEBHOOK="${NXCT_ALERT_MSTEAMS_WEBHOOK:-}"
 LOG_TIMESTAMP_FORMAT="${NXCT_ALERT_LOG_TIMESTAMP_FORMAT:-}"
 RELOAD_ON_DNS_CHANGE="${NXCT_ALERT_RELOAD_ON_DNS_CHANGE:-true}"
 PROBE_DOMAINS_RAW="${NXCT_ALERT_PROBE_DOMAINS:-true}"
+PROBE_UPSTREAMS_RAW="${NXCT_ALERT_PROBE_UPSTREAMS:-true}"
 
 # Absolute path: the cron watchdog restarts this script with a minimal PATH
 NGINX_BIN="/usr/sbin/nginx"
@@ -71,6 +72,33 @@ case "${PROBE_DOMAINS_RAW,,}" in
 esac
 for i in "${!PROBE_LIST[@]}"; do
   PROBE_LIST[$i]=$(trim "${PROBE_LIST[$i]}")
+done
+
+# NXCT_ALERT_PROBE_UPSTREAMS follows the exact same shape as NXCT_ALERT_PROBE_DOMAINS,
+# but controls check_upstream() (the raw liveness check) instead - e.g. useful to
+# silence one specific known-broken upstream without losing monitoring for every
+# other upstream on the host. check_dns_drift() (self-healing) is unaffected either
+# way, same as how NXCT_ALERT_PROBE_DOMAINS never gates it.
+UPSTREAM_PROBE_MODE="all"
+UPSTREAM_PROBE_LIST=()
+case "${PROBE_UPSTREAMS_RAW,,}" in
+  ""|true|yes|1|on)
+    UPSTREAM_PROBE_MODE="all"
+    ;;
+  false|no|0|off)
+    UPSTREAM_PROBE_MODE="none"
+    ;;
+  !*)
+    UPSTREAM_PROBE_MODE="deny"
+    IFS=',' read -ra UPSTREAM_PROBE_LIST <<< "${PROBE_UPSTREAMS_RAW#!}"
+    ;;
+  *)
+    UPSTREAM_PROBE_MODE="allow"
+    IFS=',' read -ra UPSTREAM_PROBE_LIST <<< "$PROBE_UPSTREAMS_RAW"
+    ;;
+esac
+for i in "${!UPSTREAM_PROBE_LIST[@]}"; do
+  UPSTREAM_PROBE_LIST[$i]=$(trim "${UPSTREAM_PROBE_LIST[$i]}")
 done
 
 # A 0/negative/non-numeric interval would turn the main loop into an
@@ -426,6 +454,14 @@ if [ "$PROBE_MODE" = "allow" ] || [ "$PROBE_MODE" = "deny" ]; then
       log "[upstream-monitor] WARNING: NXCT_ALERT_PROBE_DOMAINS lists \"$d\" but it is not a configured domain (check for typos)"
   done
 fi
+if [ "$UPSTREAM_PROBE_MODE" = "allow" ] || [ "$UPSTREAM_PROBE_MODE" = "deny" ]; then
+  configured_upstreams=$(get_upstream_map | cut -d'|' -f1 | sort -u)
+  for u in "${UPSTREAM_PROBE_LIST[@]}"; do
+    [ -z "$u" ] && continue
+    echo "$configured_upstreams" | grep -qxF "$u" || \
+      log "[upstream-monitor] WARNING: NXCT_ALERT_PROBE_UPSTREAMS lists \"$u\" but it is not a configured upstream (check for typos)"
+  done
+fi
 
 while true; do
   upstream_map=$(get_upstream_map)
@@ -433,8 +469,26 @@ while true; do
   while IFS='|' read -r upstream domains; do
     [ -z "$upstream" ] && continue
 
-    # Drift first, so a stale IP is healed before we judge the upstream
+    # Drift first, so a stale IP is healed before we judge the upstream - this
+    # self-healing check always runs, regardless of NXCT_ALERT_PROBE_UPSTREAMS,
+    # same as NXCT_ALERT_PROBE_DOMAINS never gates it either.
     check_dns_drift "$upstream" "$domains"
+
+    case "$UPSTREAM_PROBE_MODE" in
+      allow)
+        in_list=false
+        for u in "${UPSTREAM_PROBE_LIST[@]}"; do [ "$u" = "$upstream" ] && in_list=true && break; done
+        [ "$in_list" = true ] || continue
+        ;;
+      deny)
+        in_list=false
+        for u in "${UPSTREAM_PROBE_LIST[@]}"; do [ "$u" = "$upstream" ] && in_list=true && break; done
+        [ "$in_list" = true ] && continue
+        ;;
+      none)
+        continue
+        ;;
+    esac
 
     key=$(sanitize "$upstream")
 

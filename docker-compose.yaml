@@ -29,7 +29,7 @@ services:
   # Build locally with: docker compose build proxy
   proxy:
     container_name: proxy
-    image: neoplays/nginxcrypt:latest
+    image: rocklogicgmbh/nginxcrypt:latest
     restart: unless-stopped
     ports:
       - "80:80"
@@ -65,6 +65,7 @@ services:
     #   - NXCT_ALERT_INTERVAL=30 # check interval in seconds
     #   - NXCT_ALERT_COOLDOWN=600 # seconds between repeated alerts for the same upstream or domain
     #   - NXCT_ALERT_PROBE_DOMAINS=true # Also probe configured domains over HTTPS through this NginxCrypt instance
+    #   - NXCT_ALERT_PROBE_UPSTREAMS=true # Probe configured upstreams directly over HTTP (bypassing this NginxCrypt instance)
     #   - NXCT_ALERT_RELOAD_ON_DNS_CHANGE=true # reload Nginx service when a backend's DNS answer changes (self-healing, runs without webhooks too)
-    # extra_hosts:
-    #   - "host.docker.internal:host-gateway" # required on Linux!
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # required on Linux!
